@@ -249,13 +249,17 @@ def handle_command(chat_id, text):
         except Exception as e:
             print(e)
             send_to_telegram(chat_id, "Erreur lors du calcul du RSI.")
-            
+
     elif text == "/start" or text == "/help":
         send_to_telegram(chat_id, 
             "Bonjour ! Voici les commandes disponibles :\n\n"
             "/actu - Resume marche + actualites du jour\n"
             "/gold - Signal BUY/SHORT sur l'Or\n"
             "/eth - Signal BUY/SHORT sur Ethereum\n"
+            "/rsi - RSI Ethereum (par defaut)\n"
+            "/rsi btc - RSI Bitcoin\n"
+            "/rsi gold - RSI Or\n"
+            "/rsi sp500 - RSI S&P 500\n"
             "/help - Affiche ce message"
         )
 
