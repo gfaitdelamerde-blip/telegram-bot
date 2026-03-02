@@ -8,10 +8,10 @@ import time
 os.environ["PYTHONIOENCODING"] = "utf-8"
 
 # ================== CONFIG ==================
-NEWSAPI_KEY     = "31aaa9dd35504227b39dda10b6fadf9c"
-GROQ_API_KEY    = "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"
-TELEGRAM_TOKEN  = "8247425308:AAGPmUdyusQa9bflSddcqA18FjRjpBRhCps"
-TELEGRAM_CHAT_ID = "5846299405"
+NEWSAPI_KEY      = os.getenv("NEWSAPI_KEY")
+GROQ_API_KEY     = os.getenv("GROQ_API_KEY")
+TELEGRAM_TOKEN   = os.getenv("TELEGRAM_TOKEN")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
 GROQ_MODEL = "llama-3.3-70b-versatile"
 TICKERS = ["BTC-USD", "ETH-USD", "GC=F", "^GSPC", "^DJI", "^IXIC", "AAPL", "MSFT", "NVDA", "TSLA", "AMZN"]
@@ -213,4 +213,5 @@ while True:
         if text and chat_id:
             print(f"Message recu : {text}")
             handle_command(chat_id, text)
+
     time.sleep(1)
