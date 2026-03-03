@@ -140,16 +140,40 @@ def main_menu(chat_id):
         }
 
 def menu_signaux():
-    """Sous-menu signaux"""
+    """Menu principal signaux — 2 catégories"""
     return {
         "inline_keyboard": [
+            [{"text": "━━ 🪙 CRYPTO ━━━━━━━━━━━━━━", "callback_data": "/noop"}],
             [
-                {"text": "🥇 Signal Gold",   "callback_data": "/gold"},
-                {"text": "🔷 Signal ETH",    "callback_data": "/eth"}
+                {"text": "₿ Bitcoin",     "callback_data": "/signal btc"},
+                {"text": "🔷 Ethereum",   "callback_data": "/signal eth"}
             ],
             [
-                {"text": "🔙 Retour",        "callback_data": "/menu_retour"}
-            ]
+                {"text": "🟡 BNB",        "callback_data": "/signal bnb"},
+                {"text": "🔵 Solana",     "callback_data": "/signal sol"}
+            ],
+            [
+                {"text": "🟣 XRP",        "callback_data": "/signal xrp"},
+                {"text": "🥇 Or (Gold)",  "callback_data": "/signal gold"}
+            ],
+            [{"text": "━━ 📈 ACTIONS ━━━━━━━━━━━━━", "callback_data": "/noop"}],
+            [
+                {"text": "🍎 Apple",      "callback_data": "/signal aapl"},
+                {"text": "🟢 Nvidia",     "callback_data": "/signal nvda"}
+            ],
+            [
+                {"text": "🔵 Microsoft",  "callback_data": "/signal msft"},
+                {"text": "🚗 Tesla",      "callback_data": "/signal tsla"}
+            ],
+            [
+                {"text": "📦 Amazon",     "callback_data": "/signal amzn"},
+                {"text": "🔍 Google",     "callback_data": "/signal googl"}
+            ],
+            [
+                {"text": "📘 Meta",       "callback_data": "/signal meta"},
+                {"text": "🔴 AMD",        "callback_data": "/signal amd"}
+            ],
+            [{"text": "🔙 Retour",        "callback_data": "/menu_retour"}]
         ]
     }
 
@@ -672,35 +696,45 @@ def cmd_top(chat_id):
     send_message(chat_id, get_top5())
     send_message(chat_id, "🔄 *Que veux-tu faire ensuite ?*", reply_markup=main_menu(chat_id))
 
-def cmd_gold(chat_id):
+SIGNAL_ASSETS = {
+    "btc":   ("BTC-USD",  "₿ Bitcoin (BTC)"),
+    "eth":   ("ETH-USD",  "🔷 Ethereum (ETH)"),
+    "bnb":   ("BNB-USD",  "🟡 BNB"),
+    "sol":   ("SOL-USD",  "🔵 Solana (SOL)"),
+    "xrp":   ("XRP-USD",  "🟣 XRP"),
+    "gold":  ("GC=F",     "🥇 Or (GOLD)"),
+    "aapl":  ("AAPL",     "🍎 Apple"),
+    "nvda":  ("NVDA",     "🟢 Nvidia"),
+    "msft":  ("MSFT",     "🔵 Microsoft"),
+    "tsla":  ("TSLA",     "🚗 Tesla"),
+    "amzn":  ("AMZN",     "📦 Amazon"),
+    "googl": ("GOOGL",    "🔍 Google"),
+    "meta":  ("META",     "📘 Meta"),
+    "amd":   ("AMD",      "🔴 AMD"),
+}
+
+def cmd_signal(chat_id, asset_key):
     if not is_premium(chat_id):
         premium_lock_msg(chat_id)
         return
-    send_message(chat_id, "⏳ *Analyse Or en cours...*")
+    asset = SIGNAL_ASSETS.get(asset_key)
+    if not asset:
+        send_message(chat_id, "❌ Actif non reconnu.", reply_markup=menu_signaux())
+        return
+    ticker, name = asset
+    send_message(chat_id, f"⏳ *Analyse {name} en cours...*")
     news = get_news()
-    signal = generate_trade_signal("OR (GOLD)", "GC=F", news)
-    send_message(chat_id, f"🥇 *ANALYSE GOLD — {datetime.now().strftime('%d/%m/%Y %H:%M')}*\n\n{signal}")
-    send_message(chat_id, "🔄 *Autre signal ?*", reply_markup={
-        "inline_keyboard": [
-            [{"text": "🔷 Signal ETH",  "callback_data": "/eth"}],
-            [{"text": "🔙 Menu",        "callback_data": "/menu_retour"}]
-        ]
-    })
+    signal = generate_trade_signal(name, ticker, news)
+    send_message(chat_id, f"📈 *SIGNAL {name} — {datetime.now().strftime('%d/%m/%Y %H:%M')}*\n\n{signal}")
+    send_message(chat_id, "🔄 *Autre signal ?*", reply_markup=menu_signaux())
+
+# Garder compatibilité avec anciens boutons /gold et /eth
+def cmd_gold(chat_id):
+    cmd_signal(chat_id, "gold")
 
 def cmd_eth(chat_id):
-    if not is_premium(chat_id):
-        premium_lock_msg(chat_id)
-        return
-    send_message(chat_id, "⏳ *Analyse Ethereum en cours...*")
-    news = get_news()
-    signal = generate_trade_signal("Ethereum (ETH)", "ETH-USD", news)
-    send_message(chat_id, f"🔷 *ANALYSE ETH — {datetime.now().strftime('%d/%m/%Y %H:%M')}*\n\n{signal}")
-    send_message(chat_id, "🔄 *Autre signal ?*", reply_markup={
-        "inline_keyboard": [
-            [{"text": "🥇 Signal Gold", "callback_data": "/gold"}],
-            [{"text": "🔙 Menu",        "callback_data": "/menu_retour"}]
-        ]
-    })
+    cmd_signal(chat_id, "eth")
+
 
 def cmd_rsi(chat_id, asset_key):
     if not is_premium(chat_id):
@@ -949,7 +983,12 @@ def handle_command(chat_id, text, user_name=""):
     elif t == "/quote":
         cmd_quote(chat_id)
     elif t == "/menu_signaux":
-        send_message(chat_id, "📈 *Signaux de trading — choisis un actif :*", reply_markup=menu_signaux())
+        send_message(chat_id, "📈 *Signaux — choisis un actif :*", reply_markup=menu_signaux())
+    elif t.startswith("/signal "):
+        asset_key = t.replace("/signal ", "").strip()
+        cmd_signal(chat_id, asset_key)
+    elif t == "/noop":
+        pass  # boutons séparateurs décoratifs — ne font rien
     elif t == "/menu_rsi":
         send_message(chat_id, "📊 *RSI — choisis un actif :*", reply_markup=menu_rsi())
     elif t == "/menu_retour":
