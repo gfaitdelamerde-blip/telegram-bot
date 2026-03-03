@@ -2,3 +2,7 @@ requests
 yfinance
 openai
 pandas
+schedule
+python-dotenv
+pyTelegramBotAPI
+flask
