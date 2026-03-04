@@ -1009,6 +1009,48 @@ def menu_retour_msg(chat_id):
         msg = tr(chat_id, "menu_return_free")
     send_message(chat_id, msg, reply_markup=main_menu(chat_id))
 
+def cmd_moncompte(chat_id):
+    user = get_user(chat_id)
+    lang = get_lang(chat_id)
+    if is_admin(chat_id):
+        send_message(chat_id, "🛡️ *COMPTE ADMIN*\nAccès illimité.",
+            reply_markup={"inline_keyboard": [[{"text": tr(chat_id,"btn_back"), "callback_data": "/menu_retour"}]]})
+    elif is_premium(chat_id):
+        exp      = user.get("expiry", "Illimité")
+        balance  = user.get("paper_balance", 10000)
+        alertes  = len(user.get("alertes", []))
+        titles   = {"fr":"━━━━━━━━━━━━━━━━━━━━\n💎 *CARTE MEMBRE PREMIUM*\n━━━━━━━━━━━━━━━━━━━━",
+                    "en":"━━━━━━━━━━━━━━━━━━━━\n💎 *PREMIUM MEMBER CARD*\n━━━━━━━━━━━━━━━━━━━━",
+                    "es":"━━━━━━━━━━━━━━━━━━━━\n💎 *TARJETA MIEMBRO PREMIUM*\n━━━━━━━━━━━━━━━━━━━━"}
+        expiry_label = {"fr":f"📅 Valable jusqu'au : *{exp}*","en":f"📅 Valid until: *{exp}*","es":f"📅 Válido hasta: *{exp}*"}
+        paper_label  = {"fr":f"💰 Paper Trading : *{balance:,.2f}$*","en":f"💰 Paper Trading: *{balance:,.2f}$*","es":f"💰 Paper Trading: *{balance:,.2f}$*"}
+        alert_label  = {"fr":f"🔔 Alertes actives : *{alertes}*","en":f"🔔 Active alerts: *{alertes}*","es":f"🔔 Alertas activas: *{alertes}*"}
+        send_message(chat_id,
+            f"{titles.get(lang,titles['fr'])}\n\n"
+            f"👤 *{user.get('name','Membre')}*\n"
+            f"{tr(chat_id,'account_status')}\n"
+            f"{expiry_label.get(lang,expiry_label['fr'])}\n\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"{paper_label.get(lang,paper_label['fr'])}\n"
+            f"{alert_label.get(lang,alert_label['fr'])}\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"{tr(chat_id,'account_thanks')}",
+            reply_markup={"inline_keyboard": [
+                [{"text": tr(chat_id,"btn_sav"),  "callback_data": "/sav"}],
+                [{"text": tr(chat_id,"btn_back"), "callback_data": "/menu_retour"}]
+            ]}
+        )
+    else:
+        msgs = {"fr":f"👤 *TON COMPTE*\n━━━━━━━━━━━━━━━━━━━━\n\nNom : *{user.get('name','Membre')}*\nStatut : 🆓 Gratuit\n\nPasse Premium pour tout débloquer ⚡",
+                "en":f"👤 *YOUR ACCOUNT*\n━━━━━━━━━━━━━━━━━━━━\n\nName: *{user.get('name','Member')}*\nStatus: 🆓 Free\n\nGo Premium to unlock everything ⚡",
+                "es":f"👤 *TU CUENTA*\n━━━━━━━━━━━━━━━━━━━━\n\nNombre: *{user.get('name','Miembro')}*\nEstado: 🆓 Gratuito\n\nPasa a Premium para desbloquear todo ⚡"}
+        send_message(chat_id, msgs.get(lang, msgs["fr"]),
+            reply_markup={"inline_keyboard": [
+                [{"text": f"{tr(chat_id,'subscribe_btn')} {PRIX_MENSUEL}/mois", "url": PAYMENT_LINK}],
+                [{"text": tr(chat_id,"btn_back"), "callback_data": "/menu_retour"}]
+            ]}
+        )
+
 def cmd_actu(chat_id):
     lang = get_lang(chat_id)
     send_message(chat_id, tr(chat_id, "processing"))
@@ -1075,96 +1117,14 @@ def cmd_rsi(chat_id, asset_key):
         print(e); send_message(chat_id, tr(chat_id,"error"))
     send_message(chat_id, tr(chat_id,"rsi_other"), reply_markup=menu_rsi())
 
-    user = get_user(chat_id)
-    if is_admin(chat_id):
-        send_message(chat_id, "🛡️ *COMPTE ADMIN*\nAccès illimité.",
-            reply_markup={"inline_keyboard": [[{"text": "🔙 Retour", "callback_data": "/menu_retour"}]]})
-    elif is_premium(chat_id):
-        exp = user.get("expiry", "Illimité")
-        balance = user.get("paper_balance", 10000)
-        alertes = len(user.get("alertes", []))
-        send_message(chat_id,
-            f"━━━━━━━━━━━━━━━━━━━━\n💎 *CARTE MEMBRE PREMIUM*\n━━━━━━━━━━━━━━━━━━━━\n\n"
-            f"👤 *{user.get('name','Membre')}*\n"
-            f"🏆 Statut : *Premium Actif* ✅\n"
-            f"📅 Valable jusqu'au : *{exp}*\n\n"
-            f"━━━━━━━━━━━━━━━━━━━━\n"
-            f"💰 Paper Trading : *{balance:,.2f}$*\n"
-            f"🔔 Alertes actives : *{alertes}*\n"
-            f"━━━━━━━━━━━━━━━━━━━━\n\n"
-            f"_Merci de faire partie du cercle Premium._ 🙏",
-            reply_markup={"inline_keyboard": [
-                [{"text": "🛎️ SAV", "callback_data": "/sav"}],
-                [{"text": "🔙 Retour", "callback_data": "/menu_retour"}]
-            ]}
-        )
-    else:
-        send_message(chat_id,
-            f"👤 *TON COMPTE*\n━━━━━━━━━━━━━━━━━━━━\n\n"
-            f"Nom : *{user.get('name','Membre')}*\nStatut : 🆓 Gratuit\n\n"
-            f"Passe Premium pour tout débloquer ⚡",
-            reply_markup={"inline_keyboard": [
-                [{"text": f"👑 Passer Premium — {PRIX_MENSUEL}/mois", "url": PAYMENT_LINK}],
-                [{"text": "🔙 Retour", "callback_data": "/menu_retour"}]
-            ]}
-        )
-
-def menu_retour_msg(chat_id):
-    """Message contextuel et agréable pour le retour au menu"""
-    now = now_paris()
-    h = now.hour
-    user = get_user(chat_id)
-    name = user.get("name", "")
-    first_name = name.split()[0] if name else ""
-
-    if is_premium(chat_id):
-        # Messages variés selon l'heure
-        if 5 <= h < 12:
-            phrases = [
-                f"☀️ *Que veux-tu analyser ce matin{', ' + first_name if first_name else ''} ?*",
-                f"🌅 *Les marchés t'attendent. Par où commencer ?*",
-                f"📊 *Bonne session ! Que veux-tu explorer ?*",
-            ]
-        elif 12 <= h < 14:
-            phrases = [
-                f"🍽️ *Pause méritée. On reprend quand tu veux.*",
-                f"☀️ *Les marchés n'attendent pas. Que veux-tu voir ?*",
-            ]
-        elif 14 <= h < 18:
-            phrases = [
-                f"📈 *Wall Street est ouvert. Qu'est-ce qu'on analyse ?*",
-                f"⚡ *Séance US en cours. Saisis les opportunités.*",
-                f"🎯 *Que veux-tu surveiller maintenant ?*",
-            ]
-        elif 18 <= h < 22:
-            phrases = [
-                f"🌙 *Marchés US en clôture. Bilan ou prochain trade ?*",
-                f"📉 *Fin de séance. Que veux-tu analyser ?*",
-            ]
-        else:
-            phrases = [
-                f"🌙 *Le crypto ne dort jamais. Que veux-tu voir ?*",
-                f"🦉 *Noctambule des marchés ! Que surveilles-tu ?*",
-            ]
-        import random as _r
-        phrase = _r.choice(phrases)
-        score, sentiment, _, _ = generate_market_score()
-        e = "🟢" if score >= 60 else "🟡" if score >= 40 else "🔴"
-        msg = (
-            f"{phrase}\n\n"
-            f"{e} Score marché : *{score}/100* — {sentiment}"
-        )
-    else:
-        msg = (
-            f"🏠 *Que veux-tu faire ?*\n\n"
-            f"📰 L'actu marché est gratuite et disponible maintenant.\n"
-            f"👑 Toutes les autres fonctionnalités sont *Premium*."
-        )
-    send_message(chat_id, msg, reply_markup=main_menu(chat_id))
 def cmd_top(chat_id):
     if not is_premium(chat_id): return premium_lock(chat_id)
     send_message(chat_id, tr(chat_id, "top_loading"))
-    send_message(chat_id, get_top5(chat_id))
+    try:
+        send_message(chat_id, get_top5())
+    except Exception as e:
+        print(f"Erreur top5: {e}")
+        send_message(chat_id, tr(chat_id, "error"))
     menu_retour_msg(chat_id)
 
 def cmd_chance(chat_id):
