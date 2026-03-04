@@ -789,7 +789,60 @@ def cmd_moncompte(chat_id):
             ]}
         )
 
-def cmd_actu(chat_id):
+def menu_retour_msg(chat_id):
+    """Message contextuel et agréable pour le retour au menu"""
+    now = now_paris()
+    h = now.hour
+    user = get_user(chat_id)
+    name = user.get("name", "")
+    first_name = name.split()[0] if name else ""
+
+    if is_premium(chat_id):
+        # Messages variés selon l'heure
+        if 5 <= h < 12:
+            phrases = [
+                f"☀️ *Que veux-tu analyser ce matin{', ' + first_name if first_name else ''} ?*",
+                f"🌅 *Les marchés t'attendent. Par où commencer ?*",
+                f"📊 *Bonne session ! Que veux-tu explorer ?*",
+            ]
+        elif 12 <= h < 14:
+            phrases = [
+                f"🍽️ *Pause méritée. On reprend quand tu veux.*",
+                f"☀️ *Les marchés n'attendent pas. Que veux-tu voir ?*",
+            ]
+        elif 14 <= h < 18:
+            phrases = [
+                f"📈 *Wall Street est ouvert. Qu'est-ce qu'on analyse ?*",
+                f"⚡ *Séance US en cours. Saisis les opportunités.*",
+                f"🎯 *Que veux-tu surveiller maintenant ?*",
+            ]
+        elif 18 <= h < 22:
+            phrases = [
+                f"🌙 *Marchés US en clôture. Bilan ou prochain trade ?*",
+                f"📉 *Fin de séance. Que veux-tu analyser ?*",
+            ]
+        else:
+            phrases = [
+                f"🌙 *Le crypto ne dort jamais. Que veux-tu voir ?*",
+                f"🦉 *Noctambule des marchés ! Que surveilles-tu ?*",
+            ]
+        import random as _r
+        phrase = _r.choice(phrases)
+        score, sentiment, _, _ = generate_market_score()
+        e = "🟢" if score >= 60 else "🟡" if score >= 40 else "🔴"
+        msg = (
+            f"{phrase}\n\n"
+            f"{e} Score marché : *{score}/100* — {sentiment}"
+        )
+    else:
+        msg = (
+            f"🏠 *Que veux-tu faire ?*\n\n"
+            f"📰 L'actu marché est gratuite et disponible maintenant.\n"
+            f"👑 Toutes les autres fonctionnalités sont *Premium*."
+        )
+    send_message(chat_id, msg, reply_markup=main_menu(chat_id))
+
+
     lang = get_lang(chat_id)
     send_message(chat_id, "⏳ *Analyse en cours...* (~30s) ☕")
     news = get_news()
@@ -805,7 +858,7 @@ def cmd_actu(chat_id):
             ]}
         )
     else:
-        send_message(chat_id, "🔄", reply_markup=main_menu(chat_id))
+        menu_retour_msg(chat_id)
 
 def cmd_signal(chat_id, asset_key):
     if not is_premium(chat_id): return premium_lock(chat_id)
@@ -854,7 +907,7 @@ def cmd_top(chat_id):
     if not is_premium(chat_id): return premium_lock(chat_id)
     send_message(chat_id, "⏳ *Chargement...*")
     send_message(chat_id, get_top5())
-    send_message(chat_id, "🔄", reply_markup=main_menu(chat_id))
+    menu_retour_msg(chat_id)
 
 def cmd_chance(chat_id):
     if not is_premium(chat_id): return premium_lock(chat_id)
@@ -864,7 +917,7 @@ def cmd_chance(chat_id):
         send_message(chat_id, f"🎰 *PÉPITE DU JOUR — {now_paris().strftime('%d/%m/%Y %H:%M')}*\n\n{gem}")
     except Exception as e:
         print(e); send_message(chat_id, "❌ Erreur.")
-    send_message(chat_id, "🔄", reply_markup=main_menu(chat_id))
+    menu_retour_msg(chat_id)
 
 def cmd_quote(chat_id):
     if not is_premium(chat_id): return premium_lock(chat_id)
@@ -1643,7 +1696,7 @@ def check_auto_send():
                 ud = users.get(str(target), {}); lang = ud.get("lang","fr")
                 report = generate_weekly_report(news, market, lang)
                 send_message(tid, f"📅 *BILAN HEBDOMADAIRE — Semaine du {now.strftime('%d/%m/%Y')}*\n\n{report}")
-                send_message(tid, "🔄", reply_markup=main_menu(tid))
+                menu_retour_msg(tid)
         except Exception as e:
             print(f"Erreur bilan hebdo: {e}")
 
@@ -1707,7 +1760,7 @@ def handle_command(chat_id, text, user_name=""):
     elif t_low == "/menu_langue":            send_message(chat_id, "🌐 *Choisis ta langue :*", reply_markup=menu_langue())
     elif t_low == "/menu_alertes":           send_message(chat_id, "🔔 *Tes alertes :*", reply_markup=menu_alertes(chat_id))
     elif t_low == "/menu_paper":             cmd_paper_info(chat_id)
-    elif t_low == "/menu_retour":            send_message(chat_id, "🔄", reply_markup=main_menu(chat_id))
+    elif t_low == "/menu_retour":            menu_retour_msg(chat_id)
     elif t_low == "/noop":                   pass
     # Signaux
     elif t_low.startswith("/signal "):       cmd_signal(chat_id, t_low.replace("/signal ","").strip())
