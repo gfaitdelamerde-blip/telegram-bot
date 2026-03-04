@@ -222,6 +222,7 @@ def main_menu(chat_id):
              {"text": "📊 RSI",           "callback_data": "/menu_rsi"}],
             [{"text": "🏆 Top 5",         "callback_data": "/top"},
              {"text": "💬 Citation",      "callback_data": "/quote"}],
+            [{"text": "🤖 Wallet IA",     "callback_data": "/aiwallet"}],
             [{"text": "🧰 Mes Outils",    "callback_data": "/menu_outils"}],
             [{"text": "🏠 Accueil",       "callback_data": "/accueil"},
              {"text": "⚙️ Compte",        "callback_data": "/menu_compte"}],
@@ -238,6 +239,7 @@ def main_menu(chat_id):
             [{"text": "🔒 Score Marché",                        "callback_data": "/premium"},
              {"text": "🔒 Bilan hebdo",                         "callback_data": "/premium"}],
             [{"text": "🔒 Citation du jour",                    "callback_data": "/premium"}],
+            [{"text": "🤖 Wallet IA — PUBLIC 👀",               "callback_data": "/aiwallet"}],
             [{"text": "━━━━━━━━━━━━━━━━━━━━━━━━━━",             "callback_data": "/noop"}],
             [{"text": "👑 PASSER PREMIUM — " + PRIX_MENSUEL + "/mois ⚡", "url": PAYMENT_LINK}],
             [{"text": "🏠 Accueil",  "callback_data": "/accueil"},
@@ -1129,7 +1131,343 @@ def cmd_admin(chat_id, text):
             "`/addpremium [id] [nom] [jours]`\n`/removepremium [id]`\n"
             "`/repondre [id] [message]`\n`/listusers`\n`/stats`")
 
-# ================== ENVOI AUTO ==================
+# ================== AI WALLET PUBLIC ==================
+AI_WALLET_FILE = "ai_wallet.json"
+AI_WALLET_INITIAL = 10000.0
+AI_MAX_POSITION_PCT = 0.20   # max 20% du portefeuille par actif
+AI_STOP_LOSS_PCT    = 0.08   # stop loss automatique à -8%
+AI_TAKE_PROFIT_PCT  = 0.18   # take profit à +18%
+
+AI_TRADABLE = {
+    "btc":   ("BTC-USD",  "₿ Bitcoin"),
+    "eth":   ("ETH-USD",  "🔷 Ethereum"),
+    "sol":   ("SOL-USD",  "🔵 Solana"),
+    "nvda":  ("NVDA",     "🟢 Nvidia"),
+    "aapl":  ("AAPL",     "🍎 Apple"),
+    "msft":  ("MSFT",     "🔵 Microsoft"),
+    "tsla":  ("TSLA",     "🚗 Tesla"),
+    "meta":  ("META",     "📘 Meta"),
+    "amzn":  ("AMZN",     "📦 Amazon"),
+    "gold":  ("GC=F",     "🥇 Or"),
+}
+
+def load_ai_wallet():
+    if os.path.exists(AI_WALLET_FILE):
+        with open(AI_WALLET_FILE, "r") as f:
+            return json.load(f)
+    # Création initiale
+    wallet = {
+        "balance": AI_WALLET_INITIAL,
+        "portfolio": {},
+        "history": [],
+        "created": datetime.now().strftime("%d/%m/%Y"),
+        "last_trade": None,
+        "total_trades": 0,
+        "winning_trades": 0,
+    }
+    save_ai_wallet(wallet)
+    return wallet
+
+def save_ai_wallet(wallet):
+    with open(AI_WALLET_FILE, "w") as f:
+        json.dump(wallet, f, indent=2)
+
+def ai_wallet_total_value(wallet):
+    total = wallet["balance"]
+    for key, pos in wallet.get("portfolio", {}).items():
+        price = get_asset_price(pos["ticker"]) or pos.get("buy_price", 0)
+        total += pos["qty"] * price
+    return total
+
+def ai_wallet_pnl(wallet):
+    total = ai_wallet_total_value(wallet)
+    pnl = total - AI_WALLET_INITIAL
+    pnl_pct = (pnl / AI_WALLET_INITIAL) * 100
+    return pnl, pnl_pct
+
+def generate_ai_trade_decision(news_list, market_str, wallet):
+    """L'IA analyse le marché et décide quoi acheter/vendre"""
+    portfolio_str = ""
+    for key, pos in wallet.get("portfolio", {}).items():
+        price = get_asset_price(pos["ticker"]) or pos.get("buy_price", 0)
+        pnl_pos = ((price - pos["buy_price"]) / pos["buy_price"]) * 100
+        portfolio_str += f"- {pos['name']}: {pos['qty']:.4f} @ {pos['buy_price']:,.2f} (actuel: {price:,.2f}, P&L: {pnl_pos:+.1f}%)\n"
+
+    total_val = ai_wallet_total_value(wallet)
+    win_rate = (wallet["winning_trades"] / wallet["total_trades"] * 100) if wallet["total_trades"] > 0 else 0
+    hist_recent = wallet["history"][-5:] if wallet["history"] else []
+    hist_str = "\n".join([f"- {h['date']} {h['type']} {h['asset']}: P&L {h.get('pnl_pct',0):+.1f}%" for h in hist_recent])
+
+    prompt = f"""Tu es une IA de trading avec une mission : maximiser la valeur d'un portefeuille virtuel de façon disciplinée.
+
+PORTEFEUILLE ACTUEL :
+- Cash disponible : {wallet['balance']:,.2f}$
+- Valeur totale : {total_val:,.2f}$
+- Positions ouvertes :
+{portfolio_str if portfolio_str else "  Aucune position"}
+
+HISTORIQUE RÉCENT (5 derniers trades) :
+{hist_str if hist_str else "  Aucun trade encore"}
+Winrate actuel : {win_rate:.0f}% sur {wallet['total_trades']} trades
+
+MARCHÉS AUJOURD'HUI :
+{market_str}
+
+ACTUALITÉS :
+{chr(10).join(news_list[:8])}
+
+RÈGLES STRICTES :
+- Max 20% du portefeuille par actif
+- Stop loss mental à -8%, take profit à +18%
+- Ne pas paniquer, penser long terme
+- Bon ratio risque/gain (min 1:2)
+- Maximum 2 actions par jour (buy ou sell)
+- Si le marché est incertain, rester en cash (action = HOLD)
+
+Réponds UNIQUEMENT en JSON valide, sans texte avant ou après :
+{{
+  "decisions": [
+    {{
+      "action": "BUY" ou "SELL" ou "HOLD",
+      "asset_key": "btc" (ou autre clé),
+      "amount_usd": 500 (si BUY, montant en $),
+      "sell_pct": 100 (si SELL, % à vendre),
+      "reason": "Explication courte en français (max 80 chars)",
+      "conviction": 75
+    }}
+  ],
+  "analyse": "Analyse du marché en 2 phrases en français"
+}}
+
+Si HOLD, retourne decisions: [{{"action": "HOLD", "reason": "..."}}]"""
+
+    try:
+        raw = call_groq(prompt, max_tokens=500, temperature=0.3)
+        raw = raw.strip()
+        # Nettoie le JSON
+        if "```" in raw:
+            raw = raw.split("```")[1].replace("json","").strip()
+        return json.loads(raw)
+    except Exception as e:
+        print(f"Erreur parse décision IA: {e}")
+        return {"decisions": [{"action": "HOLD", "reason": "Analyse indisponible"}], "analyse": ""}
+
+def ai_execute_trades(wallet, decisions):
+    """Exécute les décisions de l'IA"""
+    executed = []
+    for d in decisions:
+        action = d.get("action", "HOLD")
+        if action == "HOLD":
+            continue
+        asset_key = d.get("asset_key","")
+        asset = AI_TRADABLE.get(asset_key)
+        if not asset:
+            continue
+        ticker, name = asset
+        price = get_asset_price(ticker)
+        if not price:
+            continue
+
+        if action == "BUY":
+            amount = min(float(d.get("amount_usd", 500)), wallet["balance"])
+            max_allowed = ai_wallet_total_value(wallet) * AI_MAX_POSITION_PCT
+            amount = min(amount, max_allowed)
+            if amount < 10:
+                continue
+            qty = amount / price
+            portfolio = wallet.get("portfolio", {})
+            if asset_key in portfolio:
+                # Moyenne à la baisse
+                total_qty = portfolio[asset_key]["qty"] + qty
+                total_cost = portfolio[asset_key]["qty"] * portfolio[asset_key]["buy_price"] + amount
+                portfolio[asset_key]["qty"] = total_qty
+                portfolio[asset_key]["buy_price"] = total_cost / total_qty
+            else:
+                portfolio[asset_key] = {
+                    "qty": qty, "buy_price": price, "name": name,
+                    "ticker": ticker, "date": datetime.now().strftime("%d/%m/%Y")
+                }
+            wallet["portfolio"] = portfolio
+            wallet["balance"] -= amount
+            wallet["total_trades"] += 1
+            executed.append({"type": "BUY", "asset": name, "amount": amount, "price": price, "qty": qty, "reason": d.get("reason",""), "conviction": d.get("conviction",50)})
+
+        elif action == "SELL":
+            portfolio = wallet.get("portfolio", {})
+            if asset_key not in portfolio:
+                continue
+            pos = portfolio[asset_key]
+            sell_pct = min(100, max(1, int(d.get("sell_pct", 100))))
+            qty_sell = pos["qty"] * (sell_pct / 100)
+            proceeds = qty_sell * price
+            pnl = proceeds - (pos["buy_price"] * qty_sell)
+            pnl_pct = (pnl / (pos["buy_price"] * qty_sell)) * 100
+            if sell_pct >= 100:
+                del portfolio[asset_key]
+            else:
+                portfolio[asset_key]["qty"] -= qty_sell
+            wallet["portfolio"] = portfolio
+            wallet["balance"] += proceeds
+            wallet["total_trades"] += 1
+            if pnl >= 0:
+                wallet["winning_trades"] += 1
+            executed.append({"type": "SELL", "asset": name, "amount": proceeds, "price": price, "qty": qty_sell, "pnl": pnl, "pnl_pct": pnl_pct, "reason": d.get("reason",""), "conviction": d.get("conviction",50)})
+
+    return executed
+
+def ai_check_stops(wallet):
+    """Vérifie stop loss et take profit sur toutes les positions"""
+    auto_closed = []
+    portfolio = dict(wallet.get("portfolio", {}))
+    for key, pos in list(portfolio.items()):
+        price = get_asset_price(pos["ticker"])
+        if not price:
+            continue
+        pnl_pct = ((price - pos["buy_price"]) / pos["buy_price"]) * 100
+        reason = None
+        if pnl_pct <= -AI_STOP_LOSS_PCT * 100:
+            reason = f"Stop loss déclenché ({pnl_pct:.1f}%)"
+        elif pnl_pct >= AI_TAKE_PROFIT_PCT * 100:
+            reason = f"Take profit déclenché (+{pnl_pct:.1f}%)"
+        if reason:
+            proceeds = pos["qty"] * price
+            pnl = proceeds - pos["buy_price"] * pos["qty"]
+            del portfolio[key]
+            wallet["portfolio"] = portfolio
+            wallet["balance"] += proceeds
+            wallet["total_trades"] += 1
+            if pnl >= 0:
+                wallet["winning_trades"] += 1
+            auto_closed.append({"type": "SELL", "asset": pos["name"], "amount": proceeds, "price": price, "qty": pos["qty"], "pnl": pnl, "pnl_pct": pnl_pct, "reason": reason, "conviction": 100})
+    return auto_closed
+
+def ai_daily_trade():
+    """Routine quotidienne de trading IA — appelée à 9h30"""
+    print("🤖 Trading IA quotidien...")
+    wallet = load_ai_wallet()
+    news = get_news()
+    market = get_market_data()
+
+    # 1. Vérifie les stops d'abord
+    auto_closed = ai_check_stops(wallet)
+
+    # 2. Décision IA
+    result = generate_ai_trade_decision(news, market, wallet)
+    decisions = result.get("decisions", [])
+    analyse = result.get("analyse", "")
+
+    # 3. Exécute les trades
+    executed = ai_execute_trades(wallet, decisions)
+    all_trades = auto_closed + executed
+
+    # 4. Enregistre dans l'historique
+    today = datetime.now().strftime("%d/%m/%Y")
+    for trade in all_trades:
+        wallet["history"].append({
+            "date": today,
+            "type": trade["type"],
+            "asset": trade["asset"],
+            "price": trade["price"],
+            "qty": trade["qty"],
+            "amount": trade["amount"],
+            "pnl": trade.get("pnl", 0),
+            "pnl_pct": trade.get("pnl_pct", 0),
+            "reason": trade["reason"],
+            "conviction": trade.get("conviction", 50),
+        })
+
+    wallet["last_trade"] = today
+    save_ai_wallet(wallet)
+
+    # 5. Notifie tous les utilisateurs
+    total_val = ai_wallet_total_value(wallet)
+    pnl, pnl_pct = ai_wallet_pnl(wallet)
+    e_total = "🟢" if pnl >= 0 else "🔴"
+
+    if all_trades:
+        lines = [f"🤖 *WALLET IA — TRADES DU JOUR — {today}*\n"]
+        lines.append(f"📊 Analyse : _{analyse}_\n" if analyse else "")
+        for tr in all_trades:
+            e = "📥 BUY" if tr["type"] == "BUY" else "📤 SELL"
+            pnl_str = f" | P&L: {tr.get('pnl_pct',0):+.1f}%" if tr["type"] == "SELL" else ""
+            lines.append(f"{e} *{tr['asset']}* @ {tr['price']:,.2f}$ ({tr['amount']:,.0f}$){pnl_str}")
+            lines.append(f"  💡 _{tr['reason']}_")
+        lines.append(f"\n━━━━━━━━━━━━━━━━━━━━")
+        lines.append(f"{e_total} *Valeur totale : {total_val:,.2f}$* ({pnl_pct:+.1f}% depuis création)")
+        msg = "\n".join(lines)
+    else:
+        msg = (f"🤖 *WALLET IA — {today}*\n\n"
+               f"📊 _{analyse}_\n\n"
+               f"💤 *Pas de trade aujourd'hui* — L'IA reste en attente d'une meilleure opportunité.\n\n"
+               f"{e_total} Valeur totale : *{total_val:,.2f}$* ({pnl_pct:+.1f}%)")
+
+    # Envoie à tout le monde (gratuit + premium)
+    users = load_users()
+    all_targets = [TELEGRAM_CHAT_ID] + list(users.keys())
+    for target in set(all_targets):
+        try:
+            send_message(int(target), msg, reply_markup={"inline_keyboard": [
+                [{"text": "📊 Voir le Wallet IA", "callback_data": "/aiwallet"}]
+            ]})
+        except:
+            pass
+    print(f"Trades IA: {len(all_trades)} | Valeur: {total_val:,.2f}$")
+
+def cmd_ai_wallet(chat_id):
+    """Affiche le wallet IA — accessible à TOUS"""
+    wallet = load_ai_wallet()
+    total = ai_wallet_total_value(wallet)
+    pnl, pnl_pct = ai_wallet_pnl(wallet)
+    e = "🟢" if pnl >= 0 else "🔴"
+    win_rate = (wallet["winning_trades"] / wallet["total_trades"] * 100) if wallet["total_trades"] > 0 else 0
+
+    lines = [
+        f"🤖 *WALLET IA — PERFORMANCE PUBLIQUE*",
+        f"━━━━━━━━━━━━━━━━━━━━",
+        f"📅 Créé le : *{wallet.get('created','—')}*",
+        f"💰 Capital départ : *10 000$*",
+        f"",
+        f"━━━ 📊 RÉSUMÉ ━━━",
+        f"{e} Valeur actuelle : *{total:,.2f}$*",
+        f"{e} P&L total : *{pnl:+,.2f}$ ({pnl_pct:+.1f}%)*",
+        f"🎯 Winrate : *{win_rate:.0f}%* sur *{wallet['total_trades']} trades*",
+        f"",
+    ]
+
+    # Positions ouvertes
+    portfolio = wallet.get("portfolio", {})
+    if portfolio:
+        lines.append("━━━ 💼 POSITIONS OUVERTES ━━━")
+        for key, pos in portfolio.items():
+            price = get_asset_price(pos["ticker"]) or pos["buy_price"]
+            pos_pnl = ((price - pos["buy_price"]) / pos["buy_price"]) * 100
+            ep = "🟢" if pos_pnl >= 0 else "🔴"
+            lines.append(f"{ep} *{pos['name']}* — {pos_pnl:+.1f}% (depuis {pos.get('date','—')})")
+        lines.append("")
+
+    # Historique des 8 derniers trades
+    history = wallet.get("history", [])
+    if history:
+        lines.append("━━━ 📋 DERNIERS TRADES ━━━")
+        for h in reversed(history[-8:]):
+            et = "📥" if h["type"] == "BUY" else "📤"
+            pnl_str = f" ({h.get('pnl_pct',0):+.1f}%)" if h["type"] == "SELL" else ""
+            lines.append(f"{et} {h['date']} — *{h['asset']}*{pnl_str}")
+            lines.append(f"   _{h.get('reason','')}_ ")
+
+    lines.append("━━━━━━━━━━━━━━━━━━━━")
+    lines.append("_L'IA trade chaque jour de façon autonome._")
+    lines.append("_Inspire-toi de ses trades pour ta stratégie !_")
+
+    send_message(chat_id, "\n".join(lines), reply_markup={
+        "inline_keyboard": [
+            [{"text": "🔄 Actualiser",       "callback_data": "/aiwallet"}],
+            [{"text": "👑 Rejoindre Premium", "url": PAYMENT_LINK}] if not is_premium(chat_id) else
+             [{"text": "🔙 Menu",            "callback_data": "/menu_retour"}],
+        ]
+    })
+
+
 auto_sent_today = None
 weekly_sent_this_week = None
 
@@ -1176,7 +1514,14 @@ def check_auto_send():
         except Exception as e:
             print(f"Erreur bilan hebdo: {e}")
 
-    # Vérification des alertes toutes les 5 minutes
+    # Trading IA quotidien à 9h30 (après ouverture des marchés US)
+    if now.hour == 9 and now.minute == 30 and now.second < 3 and auto_sent_today != today:
+        try:
+            ai_daily_trade()
+        except Exception as e:
+            print(f"Erreur trading IA: {e}")
+
+
     if now.second < 3 and now.minute % 5 == 0:
         try:
             check_alerts()
@@ -1198,6 +1543,7 @@ def handle_command(chat_id, text, user_name=""):
     elif t_low == "/top":                    cmd_top(chat_id)
     elif t_low == "/chance":                 cmd_chance(chat_id)
     elif t_low == "/quote":                  cmd_quote(chat_id)
+    elif t_low == "/aiwallet":                cmd_ai_wallet(chat_id)
     elif t_low == "/score":                  cmd_score(chat_id)
     elif t_low == "/performance":            cmd_performance(chat_id)
     elif t_low == "/avis":                   cmd_avis(chat_id, user_name)
