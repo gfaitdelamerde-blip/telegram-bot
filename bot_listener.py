@@ -90,8 +90,8 @@ LANGS = {
         "rsi_neutral": "⚪ NEUTRE — Pas de signal fort",
         "rsi_buy_hint": "Signal d'achat possible",
         "rsi_sell_hint": "Risque de retournement",
-        "rsi_wait_hint": "Attendre < 30 ou > 70",
-        "rsi_legend": "_RSI<30=survente | RSI>70=surachat_",
+        "rsi_wait_hint": "Attendre RSI sous 30 ou au-dessus de 70",
+        "rsi_legend": "RSI sous 30 = survente  |  RSI au-dessus de 70 = surachat",
         # Pépite
         "gem_searching": "🎰 *Recherche de la pépite... (~30s)*",
         "gem_title": "🎰 *PÉPITE DU JOUR —",
@@ -194,8 +194,8 @@ LANGS = {
         "rsi_neutral": "⚪ NEUTRAL — No strong signal",
         "rsi_buy_hint": "Possible buy signal",
         "rsi_sell_hint": "Reversal risk",
-        "rsi_wait_hint": "Wait for < 30 or > 70",
-        "rsi_legend": "_RSI<30=oversold | RSI>70=overbought_",
+        "rsi_wait_hint": "Wait for RSI below 30 or above 70",
+        "rsi_legend": "RSI below 30 = oversold  |  RSI above 70 = overbought",
         "gem_searching": "🎰 *Looking for today's gem... (~30s)*",
         "gem_title": "🎰 *GEM OF THE DAY —",
         "quote_title": "💬 *QUOTE OF THE DAY —",
@@ -282,8 +282,8 @@ LANGS = {
         "rsi_neutral": "⚪ NEUTRAL — Sin señal fuerte",
         "rsi_buy_hint": "Posible señal de compra",
         "rsi_sell_hint": "Riesgo de reversión",
-        "rsi_wait_hint": "Esperar < 30 o > 70",
-        "rsi_legend": "_RSI<30=sobrevendido | RSI>70=sobrecomprado_",
+        "rsi_wait_hint": "Esperar RSI bajo 30 o sobre 70",
+        "rsi_legend": "RSI bajo 30 = sobrevendido  |  RSI sobre 70 = sobrecomprado",
         "gem_searching": "🎰 *Buscando la joya del día... (~30s)*",
         "gem_title": "🎰 *JOYA DEL DÍA —",
         "quote_title": "💬 *CITA DEL DÍA —",
@@ -469,7 +469,12 @@ def send_message(chat_id, text, reply_markup=None):
     if reply_markup:
         payload["reply_markup"] = reply_markup
     try:
-        requests.post(url, json=payload, timeout=10)
+        r = requests.post(url, json=payload, timeout=10)
+        data = r.json()
+        if not data.get("ok"):
+            print(f"Markdown error: {data.get('description','?')} — retry plain")
+            payload.pop("parse_mode", None)
+            requests.post(url, json=payload, timeout=10)
     except Exception as e:
         print(f"Erreur envoi : {e}")
 
@@ -1092,30 +1097,41 @@ def cmd_rsi(chat_id, asset_key):
     if not asset:
         send_message(chat_id, tr(chat_id,"error"), reply_markup=menu_rsi()); return
     ticker, name = asset
+    lang = get_lang(chat_id)
     send_message(chat_id, tr(chat_id,"rsi_analyzing").format(name))
     try:
         val = compute_rsi(ticker)
         if val is None:
-            send_message(chat_id, tr(chat_id,"no_data")); return
+            send_message(chat_id, tr(chat_id,"no_data"))
+            send_message(chat_id, tr(chat_id,"rsi_other"), reply_markup=menu_rsi())
+            return
         if val < 30:
-            zone   = tr(chat_id, "rsi_oversold")
-            bar    = "🟩🟩🟩⬜⬜⬜⬜⬜⬜⬜"
+            zone    = tr(chat_id, "rsi_oversold")
+            bar     = "🟩🟩🟩⬜⬜⬜⬜⬜⬜⬜"
             conseil = tr(chat_id, "rsi_buy_hint")
         elif val > 70:
-            zone   = tr(chat_id, "rsi_overbought")
-            bar    = "🟩🟩🟩🟩🟩🟩🟩🟥🟥🟥"
+            zone    = tr(chat_id, "rsi_overbought")
+            bar     = "🟩🟩🟩🟩🟩🟩🟩🟥🟥🟥"
             conseil = tr(chat_id, "rsi_sell_hint")
         else:
-            zone   = tr(chat_id, "rsi_neutral")
-            bar    = "🟩🟩🟩🟩🟩⬜⬜⬜⬜⬜"
+            zone    = tr(chat_id, "rsi_neutral")
+            bar     = "🟩🟩🟩🟩🟩⬜⬜⬜⬜⬜"
             conseil = tr(chat_id, "rsi_wait_hint")
+        val_label  = {"fr":"Valeur","en":"Value","es":"Valor"}.get(lang,"Valeur")
+        zone_label = {"fr":"Zone","en":"Zone","es":"Zona"}.get(lang,"Zone")
         send_message(chat_id,
-            f"{tr(chat_id,'rsi_title')} — {name}*\n\n{bar}\n"
-            f"{'Valeur' if get_lang(chat_id)=='fr' else 'Value'} : *{val:.1f} / 100*\n\n"
-            f"{'Zone' if get_lang(chat_id)!='en' else 'Zone'} : {zone}\n💡 _{conseil}_\n\n{tr(chat_id,'rsi_legend')}")
+            f"*📊 RSI (14) — {name}*\n\n"
+            f"{bar}\n"
+            f"{val_label} : *{val:.1f} / 100*\n\n"
+            f"{zone_label} : {zone}\n"
+            f"💡 _{conseil}_\n\n"
+            f"{tr(chat_id,'rsi_legend')}"
+        )
+        send_message(chat_id, tr(chat_id,"rsi_other"), reply_markup=menu_rsi())
     except Exception as e:
-        print(e); send_message(chat_id, tr(chat_id,"error"))
-    send_message(chat_id, tr(chat_id,"rsi_other"), reply_markup=menu_rsi())
+        print(f"Erreur RSI {ticker}: {e}")
+        send_message(chat_id, tr(chat_id,"error"))
+        send_message(chat_id, tr(chat_id,"rsi_other"), reply_markup=menu_rsi())
 
 def cmd_top(chat_id):
     if not is_premium(chat_id): return premium_lock(chat_id)
