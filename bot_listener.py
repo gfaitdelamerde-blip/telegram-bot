@@ -63,308 +63,50 @@ RSI_ASSETS = {
 # ================== TRADUCTIONS ==================
 LANGS = {
     "fr": {
-        # Accueil
         "welcome_title": "💎 ESPACE MEMBRE PREMIUM",
         "morning": ["🌅 Bonjour", "☀️ Bon après-midi", "🌙 Bonsoir"],
         "tools": "Voici tes outils exclusifs :",
-        "briefing_auto": "🌅 Briefing auto chaque matin à *8h00*",
-        "hebdo_auto": "📅 Bilan hebdo chaque *dimanche soir*",
-        "verified": "✔️ Vérifié par des professionnels de la finance",
-        # Traitement
-        "processing": "⏳ Analyse en cours... (~30s) ☕",
-        "processing_short": "⏳ Analyse en cours...",
-        "error": "❌ Erreur lors de l'analyse. Réessaie.",
-        "no_data": "❌ Données insuffisantes.",
-        # Signaux
+        "menu_main": "🔄 Menu principal :",
+        "processing": "⏳ Analyse en cours...",
         "signal_title": "📈 SIGNAL",
-        "signal_choose": "📈 *Choisis un actif :*",
-        "signal_analyzing": "⏳ *Analyse {} en cours...*",
-        "signal_other": "🔄 *Autre signal ?*",
-        # RSI
         "rsi_title": "📊 RSI (14)",
-        "rsi_choose": "📊 *Choisis un actif :*",
-        "rsi_analyzing": "⏳ *RSI {}...*",
-        "rsi_other": "🔄 *Autre RSI ?*",
-        "rsi_oversold": "🟢 SURVENTE — Zone haussière potentielle",
-        "rsi_overbought": "🔴 SURACHAT — Zone baissière potentielle",
-        "rsi_neutral": "⚪ NEUTRE — Pas de signal fort",
-        "rsi_buy_hint": "Signal d'achat possible",
-        "rsi_sell_hint": "Risque de retournement",
-        "rsi_wait_hint": "Attendre < 30 ou > 70",
-        "rsi_legend": "_RSI<30=survente | RSI>70=surachat_",
-        # Pépite
-        "gem_searching": "🎰 *Recherche de la pépite... (~30s)*",
-        "gem_title": "🎰 *PÉPITE DU JOUR —",
-        # Citation
-        "quote_title": "💬 *CITATION DU JOUR —",
-        # Score
-        "score_title": "📅 *SCORE MARCHÉ —",
-        "score_bullish": "🟢 *Haussier*",
-        "score_neutral": "🟡 *Neutre*",
-        "score_bearish": "🔴 *Baissier*",
-        "score_bull_tip": "Les marchés sont en forme. Momentum positif.",
-        "score_neut_tip": "Marchés indécis. Prudence et sélectivité.",
-        "score_bear_tip": "Pression vendeuse. Gestion du risque prioritaire.",
-        "score_sentiment": "Sentiment :",
-        # Top 5
-        "top_loading": "⏳ *Chargement...*",
-        "top_title": "🏆 *TOP 5 ACTIONS DU JOUR*",
-        "flop_title": "📉 *FLOP 3 DU JOUR*",
-        # Paper trading
-        "paper_buy_help": "📥 *ACHETER*\n\nFormat : `buy [actif] [montant$]`\nEx : `buy btc 500`\nEx : `buy nvda 200`",
-        "paper_sell_help": "📤 *VENDRE*\n\nFormat : `sell [actif] [%]`\nEx : `sell btc 100` (vend 100%)\nEx : `sell tsla 50` (vend 50%)",
-        "paper_reset_done": "🔄 *Paper Trading réinitialisé à 10 000$*",
-        "paper_balance": "💰 Solde :",
-        "paper_positions": "📋 *POSITIONS OUVERTES*",
-        "paper_no_position": "_Aucune position ouverte._",
-        "paper_total": "Valeur totale",
-        # Alertes
-        "alert_new_help": (
-            "🔔 *NOUVELLE ALERTE DE PRIX*\n\n"
-            "Écris ton alerte dans ce format :\n\n"
-            "`alerte btc 100000 above`\n"
-            "_→ Préviens-moi quand BTC dépasse 100 000$_\n\n"
-            "`alerte eth 2000 below`\n"
-            "_→ Préviens-moi quand ETH passe sous 2 000$_\n\n"
-            "Actifs : btc, eth, bnb, sol, xrp, gold, aapl, nvda, msft, tsla, amzn, googl, meta, amd"
-        ),
-        "alert_created": "✅ *Alerte créée !*\n\n🔔 {} — Alerte quand le prix *{}* {:.2f}$\n\nTu recevras une notification automatiquement.",
-        "alert_above": "dépasse",
-        "alert_below": "passe sous",
-        "alert_triggered": "🔔 *ALERTE DÉCLENCHÉE !*\n\n{} *{}* a atteint *{:,.2f}$*\n_(Seuil fixé : {:,.2f}$)_",
-        "alert_deleted": "✅ Alerte supprimée :",
-        # SAV
-        "sav_title": "🛎️ *SERVICE CLIENT*\n━━━━━━━━━━━━━━━━━━━━\n\n*Pour quel motif nous contacter ?*",
-        "sav_tech": "🔧 Problème technique",
-        "sav_payment": "💳 Problème de paiement",
-        "sav_suggestion": "💡 Suggestion",
-        "sav_other": "❓ Autre",
-        "sav_write": "\n\n📝 *Décris ton problème ci-dessous.*\n_L'équipe te répond directement ici._",
-        "sav_sent": "✅ *Ton message a bien été envoyé !*\n\nNotre équipe te répondra directement ici. 🙏",
-        "payment_received": "⚡ *Message reçu !*\n\nTon paiement va être vérifié et ton accès activé quasi-instantanément.\nMerci 🙏",
-        # Compte
-        "account_premium_title": "━━━━━━━━━━━━━━━━━━━━\n💎 *CARTE MEMBRE PREMIUM*\n━━━━━━━━━━━━━━━━━━━━",
-        "account_status": "🏆 Statut : *Premium Actif* ✅",
-        "account_expiry": "📅 Valable jusqu'au :",
-        "account_thanks": "_Merci de faire partie du cercle Premium._ 🙏",
-        # Langue
-        "lang_changed": "✅ Langue changée :",
-        # Premium lock
-        "lock_msg": (
-            f"🔒 *Fonctionnalité Premium*\n\nDébloque tout pour *{{price}}/mois* :\n"
-            "📈 Signaux • 📊 RSI • 🎰 Pépite • 📊 Paper Trading • 🔔 Alertes\n\n"
-            "⚡ Activation quasi-instantanée"
-        ),
-        "subscribe_btn": "👑 Passer Premium —",
-        # Boutons navigation
-        "btn_back": "🔙 Retour",
-        "btn_menu": "🔙 Menu",
-        "btn_refresh": "🔄 Actualiser",
-        "btn_sav": "🛎️ Contacter le SAV",
-        # Menu retour contextuel
-        "menu_return_morning": ["☀️ *Que veux-tu analyser ce matin{} ?*", "🌅 *Les marchés t'attendent. Par où commencer ?*", "📊 *Bonne session ! Que veux-tu explorer ?*"],
-        "menu_return_noon":    ["🍽️ *Pause méritée. On reprend quand tu veux.*", "☀️ *Les marchés n'attendent pas. Que veux-tu voir ?*"],
-        "menu_return_us":      ["📈 *Wall Street est ouvert. Qu'est-ce qu'on analyse ?*", "⚡ *Séance US en cours. Saisis les opportunités.*", "🎯 *Que veux-tu surveiller maintenant ?*"],
-        "menu_return_evening": ["🌙 *Marchés US en clôture. Bilan ou prochain trade ?*", "📉 *Fin de séance. Que veux-tu analyser ?*"],
-        "menu_return_night":   ["🌙 *Le crypto ne dort jamais. Que surveilles-tu ?*", "🦉 *Noctambule des marchés ! Que surveilles-tu ?*"],
-        "menu_return_score":   "Score marché :",
-        "menu_return_free":    "🏠 *Que veux-tu faire ?*\n\n📰 L'actu marché est gratuite et disponible maintenant.\n👑 Toutes les autres fonctionnalités sont *Premium*.",
+        "thanks_review": "Merci pour ton avis ! 🙏",
+        "premium_required": "🔒 Fonctionnalité Premium",
+        "sent": "✅ Message envoyé !",
     },
     "en": {
         "welcome_title": "💎 PREMIUM MEMBER AREA",
         "morning": ["🌅 Good morning", "☀️ Good afternoon", "🌙 Good evening"],
         "tools": "Here are your exclusive tools:",
-        "briefing_auto": "🌅 Auto briefing every morning at *8:00 AM*",
-        "hebdo_auto": "📅 Weekly summary every *Sunday evening*",
-        "verified": "✔️ Verified by professional traders",
-        "processing": "⏳ Analysis in progress... (~30s) ☕",
-        "processing_short": "⏳ Analyzing...",
-        "error": "❌ Analysis error. Please try again.",
-        "no_data": "❌ Insufficient data.",
+        "menu_main": "🔄 Main menu:",
+        "processing": "⏳ Analysis in progress...",
         "signal_title": "📈 SIGNAL",
-        "signal_choose": "📈 *Choose an asset:*",
-        "signal_analyzing": "⏳ *Analyzing {}...*",
-        "signal_other": "🔄 *Another signal?*",
         "rsi_title": "📊 RSI (14)",
-        "rsi_choose": "📊 *Choose an asset:*",
-        "rsi_analyzing": "⏳ *RSI {}...*",
-        "rsi_other": "🔄 *Another RSI?*",
-        "rsi_oversold": "🟢 OVERSOLD — Potential bullish zone",
-        "rsi_overbought": "🔴 OVERBOUGHT — Potential bearish zone",
-        "rsi_neutral": "⚪ NEUTRAL — No strong signal",
-        "rsi_buy_hint": "Possible buy signal",
-        "rsi_sell_hint": "Reversal risk",
-        "rsi_wait_hint": "Wait for < 30 or > 70",
-        "rsi_legend": "_RSI<30=oversold | RSI>70=overbought_",
-        "gem_searching": "🎰 *Looking for today's gem... (~30s)*",
-        "gem_title": "🎰 *GEM OF THE DAY —",
-        "quote_title": "💬 *QUOTE OF THE DAY —",
-        "score_title": "📅 *MARKET SCORE —",
-        "score_bullish": "🟢 *Bullish*",
-        "score_neutral": "🟡 *Neutral*",
-        "score_bearish": "🔴 *Bearish*",
-        "score_bull_tip": "Markets are strong. Positive momentum.",
-        "score_neut_tip": "Indecisive markets. Be selective.",
-        "score_bear_tip": "Selling pressure. Risk management first.",
-        "score_sentiment": "Sentiment:",
-        "top_loading": "⏳ *Loading...*",
-        "top_title": "🏆 *TOP 5 STOCKS TODAY*",
-        "flop_title": "📉 *WORST 3 TODAY*",
-        "paper_buy_help": "📥 *BUY*\n\nFormat: `buy [asset] [amount$]`\nEx: `buy btc 500`\nEx: `buy nvda 200`",
-        "paper_sell_help": "📤 *SELL*\n\nFormat: `sell [asset] [%]`\nEx: `sell btc 100` (sell 100%)\nEx: `sell tsla 50` (sell 50%)",
-        "paper_reset_done": "🔄 *Paper Trading reset to $10,000*",
-        "paper_balance": "💰 Balance:",
-        "paper_positions": "📋 *OPEN POSITIONS*",
-        "paper_no_position": "_No open positions._",
-        "paper_total": "Total value",
-        "alert_new_help": (
-            "🔔 *NEW PRICE ALERT*\n\n"
-            "Write your alert in this format:\n\n"
-            "`alert btc 100000 above`\n"
-            "_→ Notify me when BTC goes above $100,000_\n\n"
-            "`alert eth 2000 below`\n"
-            "_→ Notify me when ETH drops below $2,000_\n\n"
-            "Assets: btc, eth, bnb, sol, xrp, gold, aapl, nvda, msft, tsla, amzn, googl, meta, amd"
-        ),
-        "alert_created": "✅ *Alert created!*\n\n🔔 {} — Alert when price *{}* ${:.2f}\n\nYou'll get an automatic notification.",
-        "alert_above": "goes above",
-        "alert_below": "drops below",
-        "alert_triggered": "🔔 *ALERT TRIGGERED!*\n\n{} *{}* has reached *${:,.2f}*\n_(Set threshold: ${:,.2f})_",
-        "alert_deleted": "✅ Alert deleted:",
-        "sav_title": "🛎️ *SUPPORT*\n━━━━━━━━━━━━━━━━━━━━\n\n*What's the reason for contacting us?*",
-        "sav_tech": "🔧 Technical issue",
-        "sav_payment": "💳 Payment issue",
-        "sav_suggestion": "💡 Suggestion",
-        "sav_other": "❓ Other",
-        "sav_write": "\n\n📝 *Describe your issue below.*\n_Our team will reply here directly._",
-        "sav_sent": "✅ *Your message has been sent!*\n\nOur team will reply here shortly. 🙏",
-        "payment_received": "⚡ *Message received!*\n\nYour payment will be verified and access activated instantly.\nThank you 🙏",
-        "account_premium_title": "━━━━━━━━━━━━━━━━━━━━\n💎 *PREMIUM MEMBER CARD*\n━━━━━━━━━━━━━━━━━━━━",
-        "account_status": "🏆 Status: *Premium Active* ✅",
-        "account_expiry": "📅 Valid until:",
-        "account_thanks": "_Thank you for being part of the Premium circle._ 🙏",
-        "lang_changed": "✅ Language changed:",
-        "lock_msg": "🔒 *Premium Feature*\n\nUnlock everything for *{price}/month*:\n📈 Signals • 📊 RSI • 🎰 Gem • 📊 Paper Trading • 🔔 Alerts\n\n⚡ Near-instant activation",
-        "subscribe_btn": "👑 Go Premium —",
-        "btn_back": "🔙 Back",
-        "btn_menu": "🔙 Menu",
-        "btn_refresh": "🔄 Refresh",
-        "btn_sav": "🛎️ Contact Support",
-        "menu_return_morning": ["☀️ *What do you want to analyze this morning{} ?*", "🌅 *Markets are waiting. Where to start?*", "📊 *Good session! What do you want to explore?*"],
-        "menu_return_noon":    ["🍽️ *Well-deserved break. Back whenever you're ready.*", "☀️ *Markets don't wait. What do you want to check?*"],
-        "menu_return_us":      ["📈 *Wall Street is open. What are we analyzing?*", "⚡ *US session live. Seize the opportunities.*", "🎯 *What do you want to monitor now?*"],
-        "menu_return_evening": ["🌙 *US markets closing. Review or next trade?*", "📉 *End of session. What do you want to analyze?*"],
-        "menu_return_night":   ["🌙 *Crypto never sleeps. What are you watching?*", "🦉 *Night owl trader! What are you monitoring?*"],
-        "menu_return_score":   "Market score:",
-        "menu_return_free":    "🏠 *What do you want to do?*\n\n📰 Market news is free and available now.\n👑 All other features are *Premium*.",
+        "thanks_review": "Thanks for your review! 🙏",
+        "premium_required": "🔒 Premium Feature",
+        "sent": "✅ Message sent!",
     },
     "es": {
         "welcome_title": "💎 ÁREA MIEMBRO PREMIUM",
         "morning": ["🌅 Buenos días", "☀️ Buenas tardes", "🌙 Buenas noches"],
         "tools": "Aquí están tus herramientas exclusivas:",
-        "briefing_auto": "🌅 Briefing automático cada mañana a las *8:00*",
-        "hebdo_auto": "📅 Resumen semanal cada *domingo por la noche*",
-        "verified": "✔️ Verificado por profesionales de las finanzas",
-        "processing": "⏳ Análisis en curso... (~30s) ☕",
-        "processing_short": "⏳ Analizando...",
-        "error": "❌ Error de análisis. Inténtalo de nuevo.",
-        "no_data": "❌ Datos insuficientes.",
+        "menu_main": "🔄 Menú principal:",
+        "processing": "⏳ Análisis en curso...",
         "signal_title": "📈 SEÑAL",
-        "signal_choose": "📈 *Elige un activo:*",
-        "signal_analyzing": "⏳ *Analizando {}...*",
-        "signal_other": "🔄 *¿Otra señal?*",
         "rsi_title": "📊 RSI (14)",
-        "rsi_choose": "📊 *Elige un activo:*",
-        "rsi_analyzing": "⏳ *RSI {}...*",
-        "rsi_other": "🔄 *¿Otro RSI?*",
-        "rsi_oversold": "🟢 SOBREVENDIDO — Zona alcista potencial",
-        "rsi_overbought": "🔴 SOBRECOMPRADO — Zona bajista potencial",
-        "rsi_neutral": "⚪ NEUTRAL — Sin señal fuerte",
-        "rsi_buy_hint": "Posible señal de compra",
-        "rsi_sell_hint": "Riesgo de reversión",
-        "rsi_wait_hint": "Esperar < 30 o > 70",
-        "rsi_legend": "_RSI<30=sobrevendido | RSI>70=sobrecomprado_",
-        "gem_searching": "🎰 *Buscando la joya del día... (~30s)*",
-        "gem_title": "🎰 *JOYA DEL DÍA —",
-        "quote_title": "💬 *CITA DEL DÍA —",
-        "score_title": "📅 *PUNTUACIÓN MERCADO —",
-        "score_bullish": "🟢 *Alcista*",
-        "score_neutral": "🟡 *Neutral*",
-        "score_bearish": "🔴 *Bajista*",
-        "score_bull_tip": "Los mercados están fuertes. Momentum positivo.",
-        "score_neut_tip": "Mercados indecisos. Sé selectivo.",
-        "score_bear_tip": "Presión vendedora. Gestión del riesgo primero.",
-        "score_sentiment": "Sentimiento:",
-        "top_loading": "⏳ *Cargando...*",
-        "top_title": "🏆 *TOP 5 ACCIONES HOY*",
-        "flop_title": "📉 *PEORES 3 HOY*",
-        "paper_buy_help": "📥 *COMPRAR*\n\nFormato: `buy [activo] [importe$]`\nEj: `buy btc 500`",
-        "paper_sell_help": "📤 *VENDER*\n\nFormato: `sell [activo] [%]`\nEj: `sell btc 100` (vende 100%)",
-        "paper_reset_done": "🔄 *Paper Trading reiniciado a $10,000*",
-        "paper_balance": "💰 Saldo:",
-        "paper_positions": "📋 *POSICIONES ABIERTAS*",
-        "paper_no_position": "_Sin posiciones abiertas._",
-        "paper_total": "Valor total",
-        "alert_new_help": (
-            "🔔 *NUEVA ALERTA DE PRECIO*\n\n"
-            "Escribe tu alerta en este formato:\n\n"
-            "`alerta btc 100000 above`\n"
-            "_→ Notifícame cuando BTC supere $100,000_\n\n"
-            "`alerta eth 2000 below`\n"
-            "_→ Notifícame cuando ETH caiga bajo $2,000_\n\n"
-            "Activos: btc, eth, bnb, sol, xrp, gold, aapl, nvda, msft, tsla, amzn, googl, meta, amd"
-        ),
-        "alert_created": "✅ *¡Alerta creada!*\n\n🔔 {} — Alerta cuando el precio *{}* ${:.2f}\n\nRecibirás una notificación automática.",
-        "alert_above": "supera",
-        "alert_below": "cae bajo",
-        "alert_triggered": "🔔 *¡ALERTA ACTIVADA!*\n\n{} *{}* ha alcanzado *${:,.2f}*\n_(Umbral fijado: ${:,.2f})_",
-        "alert_deleted": "✅ Alerta eliminada:",
-        "sav_title": "🛎️ *SOPORTE*\n━━━━━━━━━━━━━━━━━━━━\n\n*¿Cuál es el motivo de tu consulta?*",
-        "sav_tech": "🔧 Problema técnico",
-        "sav_payment": "💳 Problema de pago",
-        "sav_suggestion": "💡 Sugerencia",
-        "sav_other": "❓ Otro",
-        "sav_write": "\n\n📝 *Describe tu problema abajo.*\n_El equipo te responderá directamente aquí._",
-        "sav_sent": "✅ *¡Tu mensaje ha sido enviado!*\n\nNuestro equipo te responderá aquí pronto. 🙏",
-        "payment_received": "⚡ *¡Mensaje recibido!*\n\nTu pago será verificado y el acceso activado casi instantáneamente.\n¡Gracias 🙏",
-        "account_premium_title": "━━━━━━━━━━━━━━━━━━━━\n💎 *TARJETA MIEMBRO PREMIUM*\n━━━━━━━━━━━━━━━━━━━━",
-        "account_status": "🏆 Estado: *Premium Activo* ✅",
-        "account_expiry": "📅 Válido hasta:",
-        "account_thanks": "_Gracias por ser parte del círculo Premium._ 🙏",
-        "lang_changed": "✅ Idioma cambiado:",
-        "lock_msg": "🔒 *Función Premium*\n\nDesbloquea todo por *{price}/mes*:\n📈 Señales • 📊 RSI • 🎰 Joya • 📊 Paper Trading • 🔔 Alertas\n\n⚡ Activación casi instantánea",
-        "subscribe_btn": "👑 Ir a Premium —",
-        "btn_back": "🔙 Volver",
-        "btn_menu": "🔙 Menú",
-        "btn_refresh": "🔄 Actualizar",
-        "btn_sav": "🛎️ Contactar Soporte",
-        "menu_return_morning": ["☀️ *¿Qué quieres analizar esta mañana{} ?*", "🌅 *Los mercados te esperan. ¿Por dónde empezamos?*"],
-        "menu_return_noon":    ["🍽️ *Pausa merecida. Volvemos cuando quieras.*", "☀️ *Los mercados no esperan. ¿Qué quieres ver?*"],
-        "menu_return_us":      ["📈 *Wall Street abierto. ¿Qué analizamos?*", "⚡ *Sesión US en vivo. Aprovecha las oportunidades.*"],
-        "menu_return_evening": ["🌙 *Cierre de mercados US. ¿Balance o próximo trade?*"],
-        "menu_return_night":   ["🌙 *El cripto nunca duerme. ¿Qué estás vigilando?*", "🦉 *¡Trader nocturno! ¿Qué monitorizas?*"],
-        "menu_return_score":   "Puntuación mercado:",
-        "menu_return_free":    "🏠 *¿Qué quieres hacer?*\n\n📰 Las noticias del mercado son gratuitas.\n👑 Todas las demás funciones son *Premium*.",
+        "thanks_review": "¡Gracias por tu reseña! 🙏",
+        "premium_required": "🔒 Función Premium",
+        "sent": "✅ ¡Mensaje enviado!",
     },
 }
 
-def tr(chat_id, key, *args):
-    """Traduit une clé selon la langue de l'utilisateur"""
-    lang = get_lang(chat_id)
-    val = LANGS.get(lang, LANGS["fr"]).get(key) or LANGS["fr"].get(key, key)
-    if args:
-        try:
-            return val.format(*args)
-        except:
-            return val
-    return val
-
 def t(chat_id, key):
-    return tr(chat_id, key)
+    user = get_user(chat_id)
+    lang = user.get("lang", "fr")
+    return LANGS.get(lang, LANGS["fr"]).get(key, LANGS["fr"].get(key, ""))
 
 def get_lang(chat_id):
     return get_user(chat_id).get("lang", "fr")
-
 
 # ================== CITATIONS ==================
 CITATIONS = [
@@ -936,39 +678,61 @@ def check_alerts():
 # ================== COMMANDES ==================
 def premium_lock(chat_id):
     send_message(chat_id,
-        tr(chat_id, "lock_msg").replace("{price}", PRIX_MENSUEL),
+        f"🔒 *Fonctionnalité Premium*\n\nDébloque tout pour *{PRIX_MENSUEL}/mois* :\n"
+        f"📈 Signaux • 📊 RSI • 🎰 Pépite • 📊 Paper Trading • 🔔 Alertes\n\n"
+        f"⚡ Activation quasi-instantanée",
         reply_markup={"inline_keyboard": [
-            [{"text": f"{tr(chat_id,'subscribe_btn')} {PRIX_MENSUEL}/mois", "url": PAYMENT_LINK}],
-            [{"text": tr(chat_id, "btn_back"), "callback_data": "/menu_retour"}]
+            [{"text": f"👑 Passer Premium — {PRIX_MENSUEL}/mois", "url": PAYMENT_LINK}],
+            [{"text": "🔙 Retour", "callback_data": "/menu_retour"}]
         ]}
     )
 
 def cmd_accueil(chat_id, name=""):
     lang = get_lang(chat_id)
-    L = LANGS.get(lang, LANGS["fr"])
+    tr = LANGS.get(lang, LANGS["fr"])
     if is_premium(chat_id):
-        h = now_paris().hour
-        sal = L["morning"][0] if 5<=h<12 else L["morning"][1] if 12<=h<18 else L["morning"][2]
-        features = {
-            "fr": "📰 *Actu* — Résumé + direction des marchés\n📈 *Signaux* — BUY/SHORT sur 14 actifs\n📊 *RSI* — 9 actifs en temps réel\n🏆 *Top 5* — Meilleures actions du jour\n🎰 *Pépite* — Actif sous-coté à fort potentiel\n💬 *Citation* — Sagesse des grands traders\n🔔 *Alertes* — Notifications sur tes prix cibles\n📊 *Paper Trading* — Investis sans risque\n📅 *Score marché* — Santé globale en 1 chiffre",
-            "en": "📰 *News* — Summary + market direction\n📈 *Signals* — BUY/SHORT on 14 assets\n📊 *RSI* — 9 assets in real time\n🏆 *Top 5* — Best stocks today\n🎰 *Gem* — Undervalued asset with high potential\n💬 *Quote* — Wisdom from great traders\n🔔 *Alerts* — Notifications on your target prices\n📊 *Paper Trading* — Practice risk-free\n📅 *Market Score* — Global health in 1 number",
-            "es": "📰 *Noticias* — Resumen + dirección de mercados\n📈 *Señales* — BUY/SHORT en 14 activos\n📊 *RSI* — 9 activos en tiempo real\n🏆 *Top 5* — Mejores acciones del día\n🎰 *Joya* — Activo infravalorado con alto potencial\n💬 *Cita* — Sabiduría de grandes traders\n🔔 *Alertas* — Notificaciones en tus precios objetivo\n📊 *Paper Trading* — Practica sin riesgo\n📅 *Puntuación* — Salud global del mercado",
-        }
+        now = now_paris()
+        h = now.hour
+        sal = tr["morning"][0] if 5<=h<12 else tr["morning"][1] if 12<=h<18 else tr["morning"][2]
         msg = (
-            f"━━━━━━━━━━━━━━━━━━━━\n{L['welcome_title']}\n━━━━━━━━━━━━━━━━━━━━\n\n"
-            f"{sal}, *{name}* 👋\n\n{L['tools']}\n\n"
-            f"{features.get(lang, features['fr'])}\n\n"
             f"━━━━━━━━━━━━━━━━━━━━\n"
-            f"{L['briefing_auto']}\n{L['hebdo_auto']}\n{L['verified']}\n"
+            f"{tr['welcome_title']}\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"{sal}, *{name}* 👋\n\n"
+            f"{tr['tools']}\n\n"
+            f"📰 *Actu* — Résumé + direction des marchés\n"
+            f"📈 *Signaux* — BUY/SHORT sur 14 actifs\n"
+            f"📊 *RSI* — 9 actifs en temps réel\n"
+            f"🏆 *Top 5* — Meilleures actions du jour\n"
+            f"🎰 *Pépite* — Actif sous-coté à fort potentiel\n"
+            f"💬 *Citation* — Sagesse des grands traders\n"
+            f"🔔 *Alertes* — Notifications sur tes prix cibles\n"
+            f"📊 *Paper Trading* — Investis sans risque\n"
+            f"📅 *Score marché* — Santé globale en 1 chiffre\n\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"🌅 Briefing auto chaque matin à *8h00*\n"
+            f"📅 Bilan hebdo chaque *dimanche soir*\n"
+            f"✔️ Vérifié par des professionnels de la finance\n"
             f"━━━━━━━━━━━━━━━━━━━━"
         )
     else:
-        msgs = {
-            "fr": f"🏠 *ASSISTANT MARCHÉ FINANCIER*\n━━━━━━━━━━━━━━━━━━━━\n\n🆓 *GRATUIT* — Actu marché quotidienne\n\n━━━━━━━━━━━━━━━━━━━━\n\n👑 *PREMIUM — {PRIX_MENSUEL}/mois*\n✅ Signaux BUY/SHORT — 14 actifs\n✅ RSI — 9 actifs en temps réel\n✅ Paper Trading sans risque\n✅ Alertes de prix personnalisées\n✅ Score marché quotidien\n✅ Pépite du jour + Citation exclusive\n✅ Briefing auto 8h + Bilan hebdo\n\n━━━━━━━━━━━━━━━━━━━━\n💳 PayPal • ⚡ Accès quasi-instantané\n\n⬇️ *Commence ou passe Premium :*",
-            "en": f"🏠 *FINANCIAL MARKET ASSISTANT*\n━━━━━━━━━━━━━━━━━━━━\n\n🆓 *FREE* — Daily market news\n\n━━━━━━━━━━━━━━━━━━━━\n\n👑 *PREMIUM — {PRIX_MENSUEL}/month*\n✅ BUY/SHORT Signals — 14 assets\n✅ RSI — 9 assets in real time\n✅ Risk-free Paper Trading\n✅ Custom price alerts\n✅ Daily market score\n✅ Gem of the day + exclusive quote\n✅ Auto briefing 8h + weekly summary\n\n━━━━━━━━━━━━━━━━━━━━\n💳 PayPal • ⚡ Near-instant access\n\n⬇️ *Start free or go Premium:*",
-            "es": f"🏠 *ASISTENTE DE MERCADO FINANCIERO*\n━━━━━━━━━━━━━━━━━━━━\n\n🆓 *GRATIS* — Noticias diarias del mercado\n\n━━━━━━━━━━━━━━━━━━━━\n\n👑 *PREMIUM — {PRIX_MENSUEL}/mes*\n✅ Señales BUY/SHORT — 14 activos\n✅ RSI — 9 activos en tiempo real\n✅ Paper Trading sin riesgo\n✅ Alertas de precio personalizadas\n✅ Puntuación diaria del mercado\n✅ Joya del día + cita exclusiva\n✅ Briefing auto 8h + resumen semanal\n\n━━━━━━━━━━━━━━━━━━━━\n💳 PayPal • ⚡ Acceso casi instantáneo\n\n⬇️ *Empieza gratis o ve a Premium:*",
-        }
-        msg = msgs.get(lang, msgs["fr"])
+        msg = (
+            f"🏠 *ASSISTANT MARCHÉ FINANCIER*\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"🆓 *GRATUIT* — Actu marché quotidienne\n\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"👑 *PREMIUM — {PRIX_MENSUEL}/mois*\n"
+            f"✅ Signaux BUY/SHORT — 14 actifs (crypto + actions)\n"
+            f"✅ RSI — 9 actifs en temps réel\n"
+            f"✅ Paper Trading — Entraîne-toi sans risque\n"
+            f"✅ Alertes de prix personnalisées\n"
+            f"✅ Score marché quotidien\n"
+            f"✅ Pépite du jour + Citation exclusive\n"
+            f"✅ Briefing auto 8h + Bilan hebdo dimanche\n\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"💳 PayPal • ⚡ Accès quasi-instantané • 🛎️ SAV 7j/7\n\n"
+            f"⬇️ *Commence ou passe Premium :*"
+        )
     send_message(chat_id, msg, reply_markup=main_menu(chat_id))
 
 def cmd_start(chat_id, name=""):
@@ -976,105 +740,21 @@ def cmd_start(chat_id, name=""):
     cmd_accueil(chat_id, name)
 
 def cmd_welcome_premium(chat_id, name):
-    msgs = {
-        "fr": "✨ ✨ ✨\n\n*Bienvenue dans le cercle Premium.*\n\n✨ ✨ ✨",
-        "en": "✨ ✨ ✨\n\n*Welcome to the Premium circle.*\n\n✨ ✨ ✨",
-        "es": "✨ ✨ ✨\n\n*Bienvenido al círculo Premium.*\n\n✨ ✨ ✨",
-    }
-    lang = get_lang(chat_id)
-    send_message(chat_id, msgs.get(lang, msgs["fr"]))
+    send_message(chat_id, "✨ ✨ ✨\n\n*Bienvenue dans le cercle Premium.*\n\n✨ ✨ ✨")
     time.sleep(1)
     quote = get_daily_quote()
-    bodies = {
-        "fr": f"━━━━━━━━━━━━━━━━━━━━\n💎 *TON ACCÈS VIP EST ACTIF*\n━━━━━━━━━━━━━━━━━━━━\n\nTu rejoins une sélection d'investisseurs qui reçoivent chaque jour les meilleures analyses, vérifiées par des professionnels de la finance.\n\n🌅 Dès demain matin à *8h00*, ton briefing t'attendra.\n📅 Chaque dimanche soir, ton bilan de la semaine.\n\n━━━━━━━━━━━━━━━━━━━━\n💬 *Citation du jour*\n\n_{quote}_\n━━━━━━━━━━━━━━━━━━━━\n\n⬇️ *Explore tes outils exclusifs :*",
-        "en": f"━━━━━━━━━━━━━━━━━━━━\n💎 *YOUR VIP ACCESS IS ACTIVE*\n━━━━━━━━━━━━━━━━━━━━\n\nYou join a select group of investors receiving the best market analyses daily, verified by financial professionals.\n\n🌅 Starting tomorrow at *8:00 AM*, your briefing will be waiting.\n📅 Every Sunday evening, your weekly summary.\n\n━━━━━━━━━━━━━━━━━━━━\n💬 *Quote of the day*\n\n_{quote}_\n━━━━━━━━━━━━━━━━━━━━\n\n⬇️ *Explore your exclusive tools:*",
-        "es": f"━━━━━━━━━━━━━━━━━━━━\n💎 *TU ACCESO VIP ESTÁ ACTIVO*\n━━━━━━━━━━━━━━━━━━━━\n\nTe unes a un grupo selecto de inversores que reciben cada día los mejores análisis de mercado, verificados por profesionales.\n\n🌅 Desde mañana a las *8:00*, tu briefing te esperará.\n📅 Cada domingo por la noche, tu resumen semanal.\n\n━━━━━━━━━━━━━━━━━━━━\n💬 *Cita del día*\n\n_{quote}_\n━━━━━━━━━━━━━━━━━━━━\n\n⬇️ *Explora tus herramientas exclusivas:*",
-    }
-    send_message(chat_id, bodies.get(lang, bodies["fr"]).format(quote=quote), reply_markup=main_menu(chat_id))
+    send_message(chat_id,
+        f"━━━━━━━━━━━━━━━━━━━━\n💎 *TON ACCÈS VIP EST ACTIF*\n━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"Tu rejoins une sélection d'investisseurs qui reçoivent chaque jour les meilleures analyses, "
+        f"vérifiées par des professionnels de la finance.\n\n"
+        f"🌅 Dès demain matin à *8h00*, ton briefing t'attendra.\n"
+        f"📅 Chaque dimanche soir, ton bilan de la semaine.\n\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n💬 *Citation du jour*\n\n_{quote}_\n━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"⬇️ *Explore tes outils exclusifs :*",
+        reply_markup=main_menu(chat_id)
+    )
 
-def menu_retour_msg(chat_id):
-    if is_premium(chat_id):
-        h = now_paris().hour
-        fn = get_user(chat_id).get("name","").split()[0] if get_user(chat_id).get("name") else ""
-        fn_str = f", {fn}" if fn else ""
-        if 5  <= h < 12: key = "menu_return_morning"
-        elif 12 <= h < 14: key = "menu_return_noon"
-        elif 14 <= h < 18: key = "menu_return_us"
-        elif 18 <= h < 22: key = "menu_return_evening"
-        else:              key = "menu_return_night"
-        phrases = tr(chat_id, key)
-        phrase = random.choice(phrases).format(fn_str)
-        msg = phrase
-    else:
-        msg = tr(chat_id, "menu_return_free")
-    send_message(chat_id, msg, reply_markup=main_menu(chat_id))
-
-def cmd_actu(chat_id):
-    lang = get_lang(chat_id)
-    send_message(chat_id, tr(chat_id, "processing"))
-    news = get_news()
-    market = get_market_data()
-    summary = generate_summary(news, market, lang)
-    titles = {"fr": "📊 *RÉSUMÉ MARCHÉ", "en": "📊 *MARKET SUMMARY", "es": "📊 *RESUMEN MERCADO"}
-    send_message(chat_id, f"{titles.get(lang,'📊 *RÉSUMÉ')} — {now_paris().strftime('%d/%m/%Y %H:%M')}*\n\n{summary}")
-    if not is_premium(chat_id):
-        upsell = {
-            "fr": "🔒 *Veux-tu aller plus loin ?*\n\nSignaux BUY/SHORT • RSI • Paper Trading • Alertes prix",
-            "en": "🔒 *Want to go further?*\n\nBUY/SHORT Signals • RSI • Paper Trading • Price Alerts",
-            "es": "🔒 *¿Quieres ir más lejos?*\n\nSeñales BUY/SHORT • RSI • Paper Trading • Alertas de precio",
-        }
-        send_message(chat_id, upsell.get(lang, upsell["fr"]), reply_markup={"inline_keyboard": [
-            [{"text": f"{tr(chat_id,'subscribe_btn')} {PRIX_MENSUEL}/mois", "url": PAYMENT_LINK}],
-            [{"text": tr(chat_id,"btn_menu"), "callback_data": "/menu_retour"}]
-        ]})
-    else:
-        menu_retour_msg(chat_id)
-
-def cmd_signal(chat_id, asset_key):
-    if not is_premium(chat_id): return premium_lock(chat_id)
-    asset = SIGNAL_ASSETS.get(asset_key)
-    if not asset:
-        send_message(chat_id, tr(chat_id,"error"), reply_markup=menu_signaux()); return
-    ticker, name = asset
-    lang = get_lang(chat_id)
-    send_message(chat_id, tr(chat_id, "signal_analyzing").format(name))
-    news = get_news()
-    signal = generate_trade_signal(name, ticker, news, lang)
-    title = {"fr":"📈 *SIGNAL","en":"📈 *SIGNAL","es":"📈 *SEÑAL"}.get(lang,"📈 *SIGNAL")
-    send_message(chat_id, f"{title} {name} — {now_paris().strftime('%d/%m/%Y %H:%M')}*\n\n{signal}")
-    send_message(chat_id, tr(chat_id, "signal_other"), reply_markup=menu_signaux())
-
-def cmd_rsi(chat_id, asset_key):
-    if not is_premium(chat_id): return premium_lock(chat_id)
-    asset = RSI_ASSETS.get(asset_key)
-    if not asset:
-        send_message(chat_id, tr(chat_id,"error"), reply_markup=menu_rsi()); return
-    ticker, name = asset
-    send_message(chat_id, tr(chat_id,"rsi_analyzing").format(name))
-    try:
-        val = compute_rsi(ticker)
-        if val is None:
-            send_message(chat_id, tr(chat_id,"no_data")); return
-        if val < 30:
-            zone   = tr(chat_id, "rsi_oversold")
-            bar    = "🟩🟩🟩⬜⬜⬜⬜⬜⬜⬜"
-            conseil = tr(chat_id, "rsi_buy_hint")
-        elif val > 70:
-            zone   = tr(chat_id, "rsi_overbought")
-            bar    = "🟩🟩🟩🟩🟩🟩🟩🟥🟥🟥"
-            conseil = tr(chat_id, "rsi_sell_hint")
-        else:
-            zone   = tr(chat_id, "rsi_neutral")
-            bar    = "🟩🟩🟩🟩🟩⬜⬜⬜⬜⬜"
-            conseil = tr(chat_id, "rsi_wait_hint")
-        send_message(chat_id,
-            f"{tr(chat_id,'rsi_title')} — {name}*\n\n{bar}\n"
-            f"{'Valeur' if get_lang(chat_id)=='fr' else 'Value'} : *{val:.1f} / 100*\n\n"
-            f"{'Zone' if get_lang(chat_id)!='en' else 'Zone'} : {zone}\n💡 _{conseil}_\n\n{tr(chat_id,'rsi_legend')}")
-    except Exception as e:
-        print(e); send_message(chat_id, tr(chat_id,"error"))
-    send_message(chat_id, tr(chat_id,"rsi_other"), reply_markup=menu_rsi())
-
+def cmd_moncompte(chat_id):
     user = get_user(chat_id)
     if is_admin(chat_id):
         send_message(chat_id, "🛡️ *COMPTE ADMIN*\nAccès illimité.",
@@ -1109,108 +789,103 @@ def cmd_rsi(chat_id, asset_key):
             ]}
         )
 
-def menu_retour_msg(chat_id):
-    """Message contextuel et agréable pour le retour au menu"""
-    now = now_paris()
-    h = now.hour
-    user = get_user(chat_id)
-    name = user.get("name", "")
-    first_name = name.split()[0] if name else ""
-
-    if is_premium(chat_id):
-        # Messages variés selon l'heure
-        if 5 <= h < 12:
-            phrases = [
-                f"☀️ *Que veux-tu analyser ce matin{', ' + first_name if first_name else ''} ?*",
-                f"🌅 *Les marchés t'attendent. Par où commencer ?*",
-                f"📊 *Bonne session ! Que veux-tu explorer ?*",
-            ]
-        elif 12 <= h < 14:
-            phrases = [
-                f"🍽️ *Pause méritée. On reprend quand tu veux.*",
-                f"☀️ *Les marchés n'attendent pas. Que veux-tu voir ?*",
-            ]
-        elif 14 <= h < 18:
-            phrases = [
-                f"📈 *Wall Street est ouvert. Qu'est-ce qu'on analyse ?*",
-                f"⚡ *Séance US en cours. Saisis les opportunités.*",
-                f"🎯 *Que veux-tu surveiller maintenant ?*",
-            ]
-        elif 18 <= h < 22:
-            phrases = [
-                f"🌙 *Marchés US en clôture. Bilan ou prochain trade ?*",
-                f"📉 *Fin de séance. Que veux-tu analyser ?*",
-            ]
-        else:
-            phrases = [
-                f"🌙 *Le crypto ne dort jamais. Que veux-tu voir ?*",
-                f"🦉 *Noctambule des marchés ! Que surveilles-tu ?*",
-            ]
-        import random as _r
-        phrase = _r.choice(phrases)
-        score, sentiment, _, _ = generate_market_score()
-        e = "🟢" if score >= 60 else "🟡" if score >= 40 else "🔴"
-        msg = (
-            f"{phrase}\n\n"
-            f"{e} Score marché : *{score}/100* — {sentiment}"
+def cmd_actu(chat_id):
+    lang = get_lang(chat_id)
+    send_message(chat_id, "⏳ *Analyse en cours...* (~30s) ☕")
+    news = get_news()
+    market = get_market_data()
+    summary = generate_summary(news, market, lang)
+    send_message(chat_id, f"📊 *RÉSUMÉ MARCHÉ — {now_paris().strftime('%d/%m/%Y %H:%M')}*\n\n{summary}")
+    if not is_premium(chat_id):
+        send_message(chat_id,
+            f"🔒 *Veux-tu aller plus loin ?*\n\nSignaux BUY/SHORT • RSI • Paper Trading • Alertes prix",
+            reply_markup={"inline_keyboard": [
+                [{"text": f"👑 Premium — {PRIX_MENSUEL}/mois", "url": PAYMENT_LINK}],
+                [{"text": "🔙 Menu", "callback_data": "/menu_retour"}]
+            ]}
         )
     else:
-        msg = (
-            f"🏠 *Que veux-tu faire ?*\n\n"
-            f"📰 L'actu marché est gratuite et disponible maintenant.\n"
-            f"👑 Toutes les autres fonctionnalités sont *Premium*."
-        )
-    send_message(chat_id, msg, reply_markup=main_menu(chat_id))
+        send_message(chat_id, "🔄", reply_markup=main_menu(chat_id))
+
+def cmd_signal(chat_id, asset_key):
+    if not is_premium(chat_id): return premium_lock(chat_id)
+    asset = SIGNAL_ASSETS.get(asset_key)
+    if not asset:
+        send_message(chat_id, "❌ Actif non reconnu.", reply_markup=menu_signaux()); return
+    ticker, name = asset
+    lang = get_lang(chat_id)
+    send_message(chat_id, f"⏳ *Analyse {name}...*")
+    news = get_news()
+    signal = generate_trade_signal(name, ticker, news, lang)
+    send_message(chat_id, f"📈 *SIGNAL {name} — {now_paris().strftime('%d/%m/%Y %H:%M')}*\n\n{signal}")
+    send_message(chat_id, "🔄 *Autre signal ?*", reply_markup=menu_signaux())
+
+def cmd_rsi(chat_id, asset_key):
+    if not is_premium(chat_id): return premium_lock(chat_id)
+    asset = RSI_ASSETS.get(asset_key)
+    if not asset:
+        send_message(chat_id, "❌ Actif non reconnu.", reply_markup=menu_rsi()); return
+    ticker, name = asset
+    send_message(chat_id, f"⏳ *RSI {name}...*")
+    try:
+        val = compute_rsi(ticker)
+        if val is None:
+            send_message(chat_id, "❌ Données insuffisantes."); return
+        if val < 30:
+            zone = "🟢 SURVENTE — Zone haussière potentielle"
+            bar = "🟩🟩🟩⬜⬜⬜⬜⬜⬜⬜"
+            conseil = "Signal d'achat possible"
+        elif val > 70:
+            zone = "🔴 SURACHAT — Zone baissière potentielle"
+            bar = "🟩🟩🟩🟩🟩🟩🟩🟥🟥🟥"
+            conseil = "Risque de retournement"
+        else:
+            zone = "⚪ NEUTRE — Pas de signal fort"
+            bar = "🟩🟩🟩🟩🟩⬜⬜⬜⬜⬜"
+            conseil = "Attendre < 30 ou > 70"
+        send_message(chat_id,
+            f"📊 *RSI (14) — {name}*\n\n{bar}\nValeur : *{val:.1f} / 100*\n\n"
+            f"Zone : {zone}\n💡 _{conseil}_\n\n_RSI<30=survente | RSI>70=surachat_")
+    except Exception as e:
+        print(e); send_message(chat_id, "❌ Erreur RSI.")
+    send_message(chat_id, "🔄 *Autre RSI ?*", reply_markup=menu_rsi())
+
 def cmd_top(chat_id):
     if not is_premium(chat_id): return premium_lock(chat_id)
-    send_message(chat_id, tr(chat_id, "top_loading"))
-    send_message(chat_id, get_top5(chat_id))
-    menu_retour_msg(chat_id)
+    send_message(chat_id, "⏳ *Chargement...*")
+    send_message(chat_id, get_top5())
+    send_message(chat_id, "🔄", reply_markup=main_menu(chat_id))
 
 def cmd_chance(chat_id):
     if not is_premium(chat_id): return premium_lock(chat_id)
-    send_message(chat_id, tr(chat_id, "gem_searching"))
+    send_message(chat_id, "🎰 *Recherche de la pépite... (~30s)*")
     try:
-        lang = get_lang(chat_id)
-        gem = generate_hidden_gem(get_news(), lang)
-        title = {"fr": "🎰 *PÉPITE DU JOUR", "en": "🎰 *GEM OF THE DAY", "es": "🎰 *JOYA DEL DÍA"}.get(lang, "🎰 *PÉPITE DU JOUR")
-        send_message(chat_id, f"{title} — {now_paris().strftime('%d/%m/%Y %H:%M')}*\n\n{gem}")
+        gem = generate_hidden_gem(get_news())
+        send_message(chat_id, f"🎰 *PÉPITE DU JOUR — {now_paris().strftime('%d/%m/%Y %H:%M')}*\n\n{gem}")
     except Exception as e:
-        print(e); send_message(chat_id, tr(chat_id, "error"))
-    menu_retour_msg(chat_id)
+        print(e); send_message(chat_id, "❌ Erreur.")
+    send_message(chat_id, "🔄", reply_markup=main_menu(chat_id))
 
 def cmd_quote(chat_id):
     if not is_premium(chat_id): return premium_lock(chat_id)
-    title = {"fr": "💬 *CITATION DU JOUR", "en": "💬 *QUOTE OF THE DAY", "es": "💬 *CITA DEL DÍA"}.get(get_lang(chat_id), "💬 *CITATION DU JOUR")
     send_message(chat_id,
-        f"{title} — {now_paris().strftime('%d/%m/%Y')}*\n\n"
+        f"💬 *CITATION DU JOUR — {now_paris().strftime('%d/%m/%Y')}*\n\n"
         f"━━━━━━━━━━━━━━━━━━━━\n\n{get_daily_quote()}\n\n━━━━━━━━━━━━━━━━━━━━",
-        reply_markup={"inline_keyboard": [[{"text": tr(chat_id,"btn_menu"), "callback_data": "/menu_retour"}]]}
+        reply_markup={"inline_keyboard": [[{"text": "🔙 Menu", "callback_data": "/menu_retour"}]]}
     )
 
 def cmd_score(chat_id):
     if not is_premium(chat_id): return premium_lock(chat_id)
-    lang = get_lang(chat_id)
-    score, _, _, bar = generate_market_score()
-    if score >= 70:
-        sentiment = tr(chat_id, "score_bullish")
-        conseil   = tr(chat_id, "score_bull_tip")
-    elif score >= 45:
-        sentiment = tr(chat_id, "score_neutral")
-        conseil   = tr(chat_id, "score_neut_tip")
-    else:
-        sentiment = tr(chat_id, "score_bearish")
-        conseil   = tr(chat_id, "score_bear_tip")
-    title = {"fr":"📅 *SCORE MARCHÉ","en":"📅 *MARKET SCORE","es":"📅 *PUNTUACIÓN MERCADO"}.get(lang,"📅 *SCORE MARCHÉ")
+    score, sentiment, conseil, bar = generate_market_score()
     send_message(chat_id,
-        f"{title} — {now_paris().strftime('%d/%m/%Y')}*\n\n"
+        f"📅 *SCORE MARCHÉ — {now_paris().strftime('%d/%m/%Y')}*\n\n"
         f"┌─────────────────┐\n"
         f"│  {bar}  │\n"
         f"│     *{score}/100*          │\n"
         f"└─────────────────┘\n\n"
-        f"{tr(chat_id,'score_sentiment')} {sentiment}\n"
+        f"Sentiment : {sentiment}\n"
         f"💡 _{conseil}_",
-        reply_markup={"inline_keyboard": [[{"text": tr(chat_id,"btn_back"), "callback_data": "/menu_outils"}]]}
+        reply_markup={"inline_keyboard": [[{"text": "🔙 Retour", "callback_data": "/menu_outils"}]]}
     )
 
 def cmd_performance(chat_id):
@@ -1259,34 +934,38 @@ def cmd_avis(chat_id, name=""):
     if not is_premium(chat_id): return premium_lock(chat_id)
     user = get_user(chat_id)
     if user.get("avis_done"):
-        already = {"fr":"⭐ *Tu as déjà laissé un avis. Merci !* 🙏","en":"⭐ *You already left a review. Thank you!* 🙏","es":"⭐ *Ya dejaste una reseña. ¡Gracias!* 🙏"}
-        send_message(chat_id, already.get(get_lang(chat_id), already["fr"]),
-            reply_markup={"inline_keyboard": [[{"text": tr(chat_id,"btn_back"), "callback_data": "/menu_outils"}]]})
+        send_message(chat_id, "⭐ *Tu as déjà laissé un avis. Merci !* 🙏",
+            reply_markup={"inline_keyboard": [[{"text": "🔙 Retour", "callback_data": "/menu_outils"}]]})
         return
-    titles  = {"fr":"⭐ *DONNE TON AVIS*\n\nTon retour nous aide à améliorer le bot.\n\n*Comment notes-tu ton expérience ?*",
-               "en":"⭐ *LEAVE A REVIEW*\n\nYour feedback helps us improve the bot.\n\n*How do you rate your experience?*",
-               "es":"⭐ *DEJA TU RESEÑA*\n\nTu opinión nos ayuda a mejorar el bot.\n\n*¿Cómo valoras tu experiencia?*"}
-    ratings = {"fr":[("⭐⭐⭐⭐⭐ Excellent","/avis_5"),("⭐⭐⭐⭐ Bien","/avis_4"),("⭐⭐⭐ Correct","/avis_3"),("⭐⭐ Peut mieux faire","/avis_2")],
-               "en":[("⭐⭐⭐⭐⭐ Excellent","/avis_5"),("⭐⭐⭐⭐ Good","/avis_4"),("⭐⭐⭐ OK","/avis_3"),("⭐⭐ Needs work","/avis_2")],
-               "es":[("⭐⭐⭐⭐⭐ Excelente","/avis_5"),("⭐⭐⭐⭐ Bueno","/avis_4"),("⭐⭐⭐ Correcto","/avis_3"),("⭐⭐ Mejorable","/avis_2")]}
-    lang = get_lang(chat_id)
-    rs = ratings.get(lang, ratings["fr"])
-    send_message(chat_id, titles.get(lang, titles["fr"]), reply_markup={"inline_keyboard": [
-        [{"text": rs[0][0], "callback_data": rs[0][1]}, {"text": rs[1][0], "callback_data": rs[1][1]}],
-        [{"text": rs[2][0], "callback_data": rs[2][1]}, {"text": rs[3][0], "callback_data": rs[3][1]}],
-        [{"text": tr(chat_id,"btn_back"), "callback_data": "/menu_outils"}],
-    ]})
+    send_message(chat_id,
+        f"⭐ *DONNE TON AVIS*\n\n"
+        f"Ton retour nous aide à améliorer le bot et rassure les nouveaux membres.\n\n"
+        f"*Comment notes-tu ton expérience ?*",
+        reply_markup={"inline_keyboard": [
+            [{"text": "⭐⭐⭐⭐⭐ Excellent",  "callback_data": "/avis_5"},
+             {"text": "⭐⭐⭐⭐ Bien",         "callback_data": "/avis_4"}],
+            [{"text": "⭐⭐⭐ Correct",        "callback_data": "/avis_3"},
+             {"text": "⭐⭐ Peut mieux faire", "callback_data": "/avis_2"}],
+            [{"text": "🔙 Retour",             "callback_data": "/menu_outils"}],
+        ]}
+    )
 
 def cmd_avis_note(chat_id, name, note):
     stars = "⭐" * note
     set_user_field(chat_id, "avis_done", True)
+    set_user_field(chat_id, "avis_note", note)
+    send_message(chat_id,
+        f"{stars} *Merci pour ton avis !*\n\n"
+        f"_Si tu as un commentaire à ajouter, écris-le maintenant._\n"
+        f"_(ou appuie sur Retour pour ignorer)_",
+        reply_markup={"inline_keyboard": [[{"text": "🔙 Retour", "callback_data": "/menu_outils"}]]}
+    )
     set_user_field(chat_id, "sav_motif", f"[AVIS {note}★]")
-    msgs = {"fr":f"{stars} *Merci pour ton avis !*\n\n_Si tu as un commentaire, écris-le maintenant._\n_(ou Retour pour ignorer)_",
-            "en":f"{stars} *Thank you for your review!*\n\n_Feel free to add a comment now._\n_(or Back to skip)_",
-            "es":f"{stars} *¡Gracias por tu reseña!*\n\n_Puedes añadir un comentario ahora._\n_(o Volver para omitir)_"}
-    send_message(chat_id, msgs.get(get_lang(chat_id), msgs["fr"]),
-        reply_markup={"inline_keyboard": [[{"text": tr(chat_id,"btn_back"), "callback_data": "/menu_outils"}]]})
-    send_message(TELEGRAM_CHAT_ID, f"⭐ *NOUVEL AVIS*\n👤 {name} | {stars}\n🆔 `{chat_id}`")
+    send_message(TELEGRAM_CHAT_ID,
+        f"⭐ *NOUVEL AVIS REÇU*\n\n"
+        f"👤 {name} | Note : {stars}\n"
+        f"ID : `{chat_id}`"
+    )
 
 def cmd_alerte_new(chat_id):
     if not is_premium(chat_id): return premium_lock(chat_id)
@@ -1388,28 +1067,29 @@ def cmd_paper_info(chat_id):
 # ================== SAV ==================
 def cmd_sav(chat_id, name=""):
     send_message(chat_id,
-        tr(chat_id, "sav_title"),
+        f"🛎️ *SERVICE CLIENT*\n━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"*Pour quel motif nous contacter ?*",
         reply_markup={"inline_keyboard": [
-            [{"text": tr(chat_id, "sav_tech"),       "callback_data": "/sav_tech"}],
-            [{"text": tr(chat_id, "sav_payment"),    "callback_data": "/sav_paiement"}],
-            [{"text": tr(chat_id, "sav_suggestion"), "callback_data": "/sav_suggestion"}],
-            [{"text": tr(chat_id, "sav_other"),      "callback_data": "/sav_autre"}],
-            [{"text": tr(chat_id, "btn_back"),       "callback_data": "/menu_retour"}],
+            [{"text": "🔧 Problème technique",   "callback_data": "/sav_tech"}],
+            [{"text": "💳 Problème de paiement", "callback_data": "/sav_paiement"}],
+            [{"text": "💡 Suggestion",            "callback_data": "/sav_suggestion"}],
+            [{"text": "❓ Autre",                 "callback_data": "/sav_autre"}],
+            [{"text": "🔙 Retour",               "callback_data": "/menu_retour"}],
         ]}
     )
 
 def cmd_sav_motif(chat_id, name, motif):
-    titres = {
-        "tech":       tr(chat_id, "sav_tech"),
-        "paiement":   tr(chat_id, "sav_payment"),
-        "suggestion": tr(chat_id, "sav_suggestion"),
-        "autre":      tr(chat_id, "sav_other"),
+    motifs = {
+        "tech":       "🔧 Problème technique",
+        "paiement":   "💳 Problème de paiement",
+        "suggestion": "💡 Suggestion",
+        "autre":      "❓ Autre demande",
     }
-    titre = titres.get(motif, tr(chat_id, "sav_other"))
+    titre = motifs.get(motif, "❓ Demande")
     set_user_field(chat_id, "sav_motif", titre)
     send_message(chat_id,
-        f"{titre}{tr(chat_id,'sav_write')}",
-        reply_markup={"inline_keyboard": [[{"text": tr(chat_id,"btn_back"), "callback_data": "/sav"}]]}
+        f"{titre}\n\n📝 *Décris ton problème ci-dessous.*\n_L'équipe te répond directement ici._",
+        reply_markup={"inline_keyboard": [[{"text": "🔙 Retour SAV", "callback_data": "/sav"}]]}
     )
 
 def notify_admin_sav(chat_id, name, text):
@@ -1963,7 +1643,7 @@ def check_auto_send():
                 ud = users.get(str(target), {}); lang = ud.get("lang","fr")
                 report = generate_weekly_report(news, market, lang)
                 send_message(tid, f"📅 *BILAN HEBDOMADAIRE — Semaine du {now.strftime('%d/%m/%Y')}*\n\n{report}")
-                menu_retour_msg(tid)
+                send_message(tid, "🔄", reply_markup=main_menu(tid))
         except Exception as e:
             print(f"Erreur bilan hebdo: {e}")
 
@@ -2027,7 +1707,7 @@ def handle_command(chat_id, text, user_name=""):
     elif t_low == "/menu_langue":            send_message(chat_id, "🌐 *Choisis ta langue :*", reply_markup=menu_langue())
     elif t_low == "/menu_alertes":           send_message(chat_id, "🔔 *Tes alertes :*", reply_markup=menu_alertes(chat_id))
     elif t_low == "/menu_paper":             cmd_paper_info(chat_id)
-    elif t_low == "/menu_retour":            menu_retour_msg(chat_id)
+    elif t_low == "/menu_retour":            send_message(chat_id, "🔄", reply_markup=main_menu(chat_id))
     elif t_low == "/noop":                   pass
     # Signaux
     elif t_low.startswith("/signal "):       cmd_signal(chat_id, t_low.replace("/signal ","").strip())
@@ -2081,10 +1761,7 @@ def handle_command(chat_id, text, user_name=""):
         if lang in LANGS:
             set_user_field(chat_id, "lang", lang)
             flags = {"fr":"🇫🇷 Français","en":"🇬🇧 English","es":"🇪🇸 Español"}
-            # tr() now uses the NEW lang since we just saved it
-            send_message(chat_id,
-                f"{tr(chat_id,'lang_changed')} *{flags[lang]}*",
-                reply_markup=main_menu(chat_id))
+            send_message(chat_id, f"✅ Langue changée : *{flags[lang]}*", reply_markup=main_menu(chat_id))
     # Messages libres
     else:
         user = get_user(chat_id)
@@ -2097,18 +1774,22 @@ def handle_command(chat_id, text, user_name=""):
                 return
 
         # Alertes
-        if motif == "[ALERTE_NEW]" or t_low.startswith("alerte ") or t_low.startswith("alert ") or t_low.startswith("alerta "):
+        if motif == "[ALERTE_NEW]" or t_low.startswith("alerte "):
             if parse_alerte(chat_id, text):
                 set_user_field(chat_id, "sav_motif", "")
                 return
 
-        # SAV / paiement — confirmation dans la bonne langue
+        # SAV / paiement
         notify_admin_sav(chat_id, user_name, text)
         set_user_field(chat_id, "sav_motif", "")
         if not is_premium(chat_id):
-            send_message(chat_id, tr(chat_id, "payment_received"), reply_markup=main_menu(chat_id))
+            send_message(chat_id,
+                "⚡ *Message reçu !*\n\nTon paiement va être vérifié et ton accès activé quasi-instantanément.\nMerci 🙏",
+                reply_markup=main_menu(chat_id))
         else:
-            send_message(chat_id, tr(chat_id, "sav_sent"), reply_markup=main_menu(chat_id))
+            send_message(chat_id,
+                "✅ *Message envoyé !*\n\nNotre équipe te répondra directement ici. 🙏",
+                reply_markup=main_menu(chat_id))
 
 # ================== BOUCLE PRINCIPALE ==================
 def get_updates(offset=None):
