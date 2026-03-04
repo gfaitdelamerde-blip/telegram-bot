@@ -2,13 +2,20 @@ import os
 import requests
 import yfinance as yf
 from openai import OpenAI
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import time
 import pandas as pd
 import json
 import random
+import pytz
 
 os.environ["PYTHONIOENCODING"] = "utf-8"
+
+PARIS_TZ = pytz.timezone("Europe/Paris")
+
+def now_paris():
+    return datetime.now(pytz.utc).astimezone(PARIS_TZ).replace(tzinfo=None)
+
 
 # ================== CONFIG ==================
 NEWSAPI_KEY      = os.getenv("NEWSAPI_KEY")
@@ -137,7 +144,7 @@ CITATIONS = [
 ]
 
 def get_daily_quote():
-    idx = datetime.now().timetuple().tm_yday % len(CITATIONS)
+    idx = now_paris().timetuple().tm_yday % len(CITATIONS)
     text, author = CITATIONS[idx]
     return f'"{text}"\n— *{author}*'
 
@@ -166,12 +173,12 @@ def is_premium(chat_id):
         exp = user.get("expiry")
         if not exp:
             return True
-        return datetime.now() < datetime.strptime(exp, "%Y-%m-%d")
+        return now_paris() < datetime.strptime(exp, "%Y-%m-%d")
     return False
 
 def add_premium(chat_id, name, days):
     users = load_users()
-    expiry = (datetime.now() + timedelta(days=days)).strftime("%Y-%m-%d")
+    expiry = (now_paris() + timedelta(days=days)).strftime("%Y-%m-%d")
     if str(chat_id) not in users:
         users[str(chat_id)] = {}
     users[str(chat_id)].update({"plan": "premium", "expiry": expiry, "name": name})
@@ -422,7 +429,7 @@ def call_groq(prompt, max_tokens=1100, temperature=0.4):
     return r.choices[0].message.content
 
 def generate_summary(news_list, market_str, lang="fr"):
-    today = datetime.now().strftime('%d/%m/%Y')
+    today = now_paris().strftime('%d/%m/%Y')
     if lang == "en":
         instr = "Answer in English with emojis, phone format:"
     elif lang == "es":
@@ -446,7 +453,7 @@ def generate_trade_signal(asset_name, ticker, news_list, lang="fr"):
     pc = prices[-1]
     chg = ((pc - prices[-2]) / prices[-2]) * 100
     sma = sum(prices) / len(prices)
-    today = datetime.now().strftime('%d/%m/%Y %H:%M')
+    today = now_paris().strftime('%d/%m/%Y %H:%M')
     lang_instr = {"fr": "Réponds en français", "en": "Answer in English", "es": "Responde en español"}
     prompt = f"""Professional trader. {today} — {asset_name}
 Price: {pc:,.2f} | Change: {chg:+.2f}% | SMA5: {sma:,.2f}
@@ -486,7 +493,7 @@ def generate_market_score():
         return 50, "🟡 *Neutre*", "Données indisponibles.", "█████░░░░░"
 
 def generate_weekly_report(news_list, market_str, lang="fr"):
-    today = datetime.now().strftime('%d/%m/%Y')
+    today = now_paris().strftime('%d/%m/%Y')
     lang_instr = {"fr": "Réponds en français", "en": "Answer in English", "es": "Responde en español"}
     prompt = f"""Senior financial analyst. Week ending {today}.
 MARKETS THIS WEEK: {market_str}
@@ -500,7 +507,7 @@ Max 3500 chars."""
     return call_groq(prompt, max_tokens=1100)
 
 def generate_hidden_gem(news_list):
-    today = datetime.now().strftime('%d/%m/%Y')
+    today = now_paris().strftime('%d/%m/%Y')
     candidates = {
         "RENDER-USD":"Render (RNDR)","INJ-USD":"Injective (INJ)",
         "FET-USD":"Fetch.ai (FET)","OCEAN-USD":"Ocean Protocol",
@@ -571,7 +578,7 @@ def paper_buy(chat_id, ticker_key, amount_usd):
     if "paper_history" not in users[uid]:
         users[uid]["paper_history"] = []
     users[uid]["paper_history"].append({
-        "date": datetime.now().strftime("%d/%m/%Y %H:%M"),
+        "date": now_paris().strftime("%d/%m/%Y %H:%M"),
         "type": "BUY", "asset": name, "amount": amount_usd, "price": price, "qty": qty
     })
     save_users(users)
@@ -605,7 +612,7 @@ def paper_sell(chat_id, ticker_key, pct=100):
     if "paper_history" not in users[uid]:
         users[uid]["paper_history"] = []
     users[uid]["paper_history"].append({
-        "date": datetime.now().strftime("%d/%m/%Y %H:%M"),
+        "date": now_paris().strftime("%d/%m/%Y %H:%M"),
         "type": "SELL", "asset": name, "amount": proceeds, "price": price, "pnl": pnl
     })
     save_users(users)
@@ -684,7 +691,7 @@ def cmd_accueil(chat_id, name=""):
     lang = get_lang(chat_id)
     tr = LANGS.get(lang, LANGS["fr"])
     if is_premium(chat_id):
-        now = datetime.now()
+        now = now_paris()
         h = now.hour
         sal = tr["morning"][0] if 5<=h<12 else tr["morning"][1] if 12<=h<18 else tr["morning"][2]
         msg = (
@@ -788,7 +795,7 @@ def cmd_actu(chat_id):
     news = get_news()
     market = get_market_data()
     summary = generate_summary(news, market, lang)
-    send_message(chat_id, f"📊 *RÉSUMÉ MARCHÉ — {datetime.now().strftime('%d/%m/%Y %H:%M')}*\n\n{summary}")
+    send_message(chat_id, f"📊 *RÉSUMÉ MARCHÉ — {now_paris().strftime('%d/%m/%Y %H:%M')}*\n\n{summary}")
     if not is_premium(chat_id):
         send_message(chat_id,
             f"🔒 *Veux-tu aller plus loin ?*\n\nSignaux BUY/SHORT • RSI • Paper Trading • Alertes prix",
@@ -810,7 +817,7 @@ def cmd_signal(chat_id, asset_key):
     send_message(chat_id, f"⏳ *Analyse {name}...*")
     news = get_news()
     signal = generate_trade_signal(name, ticker, news, lang)
-    send_message(chat_id, f"📈 *SIGNAL {name} — {datetime.now().strftime('%d/%m/%Y %H:%M')}*\n\n{signal}")
+    send_message(chat_id, f"📈 *SIGNAL {name} — {now_paris().strftime('%d/%m/%Y %H:%M')}*\n\n{signal}")
     send_message(chat_id, "🔄 *Autre signal ?*", reply_markup=menu_signaux())
 
 def cmd_rsi(chat_id, asset_key):
@@ -854,7 +861,7 @@ def cmd_chance(chat_id):
     send_message(chat_id, "🎰 *Recherche de la pépite... (~30s)*")
     try:
         gem = generate_hidden_gem(get_news())
-        send_message(chat_id, f"🎰 *PÉPITE DU JOUR — {datetime.now().strftime('%d/%m/%Y %H:%M')}*\n\n{gem}")
+        send_message(chat_id, f"🎰 *PÉPITE DU JOUR — {now_paris().strftime('%d/%m/%Y %H:%M')}*\n\n{gem}")
     except Exception as e:
         print(e); send_message(chat_id, "❌ Erreur.")
     send_message(chat_id, "🔄", reply_markup=main_menu(chat_id))
@@ -862,7 +869,7 @@ def cmd_chance(chat_id):
 def cmd_quote(chat_id):
     if not is_premium(chat_id): return premium_lock(chat_id)
     send_message(chat_id,
-        f"💬 *CITATION DU JOUR — {datetime.now().strftime('%d/%m/%Y')}*\n\n"
+        f"💬 *CITATION DU JOUR — {now_paris().strftime('%d/%m/%Y')}*\n\n"
         f"━━━━━━━━━━━━━━━━━━━━\n\n{get_daily_quote()}\n\n━━━━━━━━━━━━━━━━━━━━",
         reply_markup={"inline_keyboard": [[{"text": "🔙 Menu", "callback_data": "/menu_retour"}]]}
     )
@@ -871,7 +878,7 @@ def cmd_score(chat_id):
     if not is_premium(chat_id): return premium_lock(chat_id)
     score, sentiment, conseil, bar = generate_market_score()
     send_message(chat_id,
-        f"📅 *SCORE MARCHÉ — {datetime.now().strftime('%d/%m/%Y')}*\n\n"
+        f"📅 *SCORE MARCHÉ — {now_paris().strftime('%d/%m/%Y')}*\n\n"
         f"┌─────────────────┐\n"
         f"│  {bar}  │\n"
         f"│     *{score}/100*          │\n"
@@ -889,7 +896,7 @@ def cmd_performance(chat_id):
         exp_date = datetime.strptime(joined, "%Y-%m-%d")
         start = exp_date - timedelta(days=30)
     else:
-        start = datetime.now() - timedelta(days=30)
+        start = now_paris() - timedelta(days=30)
     try:
         data = yf.download(["BTC-USD","^GSPC","NVDA"], period="30d", interval="1d", progress=False)["Close"]
         chg = {}
@@ -1160,7 +1167,7 @@ def load_ai_wallet():
         "balance": AI_WALLET_INITIAL,
         "portfolio": {},
         "history": [],
-        "created": datetime.now().strftime("%d/%m/%Y"),
+        "created": now_paris().strftime("%d/%m/%Y"),
         "last_trade": None,
         "total_trades": 0,
         "winning_trades": 0,
@@ -1285,7 +1292,7 @@ def ai_execute_trades(wallet, decisions):
             else:
                 portfolio[asset_key] = {
                     "qty": qty, "buy_price": price, "name": name,
-                    "ticker": ticker, "date": datetime.now().strftime("%d/%m/%Y")
+                    "ticker": ticker, "date": now_paris().strftime("%d/%m/%Y")
                 }
             wallet["portfolio"] = portfolio
             wallet["balance"] -= amount
@@ -1361,7 +1368,7 @@ def ai_daily_trade():
     all_trades = auto_closed + executed
 
     # 4. Enregistre dans l'historique
-    today = datetime.now().strftime("%d/%m/%Y")
+    today = now_paris().strftime("%d/%m/%Y")
     for trade in all_trades:
         wallet["history"].append({
             "date": today,
@@ -1473,7 +1480,7 @@ weekly_sent_this_week = None
 
 def check_auto_send():
     global auto_sent_today, weekly_sent_this_week
-    now = datetime.now()
+    now = now_paris()
     today = now.strftime('%Y-%m-%d')
     week = now.strftime('%Y-%W')
 
