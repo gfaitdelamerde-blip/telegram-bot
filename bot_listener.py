@@ -2083,7 +2083,9 @@ def cmd_admin(chat_id, text):
             "`/repondre [id] [message]`\n`/listusers`\n`/stats`")
 
 # ================== AI WALLET PUBLIC ==================
-AI_WALLET_FILE = "ai_wallet.json"
+AI_WALLET_FILE   = "ai_wallet.json"
+USER_WALLETS_FILE = "user_wallets.json"
+UW_INITIAL        = 10000.0
 AI_WALLET_INITIAL = 10000.0
 AI_MAX_POSITION_PCT = 0.20
 AI_STOP_LOSS_PCT    = 0.08
@@ -2518,6 +2520,11 @@ def ai_run_analysis(breaking_news=None):
         wallet["last_trade"] = now_str
         save_ai_wallet(wallet)
 
+        # Copy trading — applique les trades aux users qui ont activé le copy
+        if all_trades:
+            aria_size = ai_wallet_total_value(wallet) + sum(t.get("amount",0) for t in all_trades if t["type"] in ["BUY","SHORT"])
+            threading.Thread(target=run_copy_trading, args=(all_trades, aria_size), daemon=True).start()
+
         if not all_trades:
             print(f"IA HOLD — {analyse[:60] if analyse else 'RAS'}")
             return
@@ -2738,6 +2745,445 @@ def check_auto_send():
             except Exception as e:
                 print(f"Erreur lecon: {e}")
 
+
+# ════════════════════════════════════════════════════════════════
+# USER WALLET SYSTEM — copy trading + trades manuels
+# ════════════════════════════════════════════════════════════════
+_uw_lock = threading.Lock()
+
+def _uw_token(chat_id):
+    import hashlib
+    return hashlib.md5(f"uw_{chat_id}_aria".encode()).hexdigest()[:12].upper()
+
+def load_user_wallets():
+    if os.path.exists(USER_WALLETS_FILE):
+        try:
+            with open(USER_WALLETS_FILE) as f: return json.load(f)
+        except: pass
+    return {}
+
+def save_user_wallets(data):
+    with _uw_lock:
+        with open(USER_WALLETS_FILE, "w") as f: json.dump(data, f)
+
+def get_user_wallet(chat_id):
+    wallets = load_user_wallets()
+    sid = str(chat_id)
+    if sid not in wallets:
+        wallets[sid] = {
+            "balance": UW_INITIAL, "portfolio": {}, "history": [],
+            "copy_trading": False, "token": _uw_token(chat_id),
+            "created": now_paris().strftime("%d/%m/%Y"),
+            "total_trades": 0, "winning_trades": 0,
+            "perf_history": [{"d": now_paris().strftime("%d/%m/%Y"), "v": UW_INITIAL}],
+            "name": get_user(chat_id).get("name", "User"),
+        }
+        save_user_wallets(wallets)
+    return wallets[sid]
+
+def save_user_wallet(chat_id, wallet):
+    wallets = load_user_wallets()
+    wallets[str(chat_id)] = wallet
+    save_user_wallets(wallets)
+
+def uw_total_value(w):
+    total = w.get("balance", 0)
+    for key, pos in w.get("portfolio", {}).items():
+        price = get_asset_price(pos["ticker"]) or pos.get("buy_price", 0)
+        if pos.get("type") == "SHORT":
+            total += pos["qty"] * pos["buy_price"] + (pos["buy_price"] - price) * pos["qty"]
+        else:
+            total += pos["qty"] * price
+    return max(total, 0)
+
+def uw_pnl(w):
+    total = uw_total_value(w)
+    pnl = total - UW_INITIAL
+    return pnl, (pnl / UW_INITIAL * 100)
+
+# ── Copy trading: called from ai_run_analysis after each trade ──
+def _copy_trade_for_user(chat_id, uw, trade, aria_wallet_size):
+    """Réplique proportionnellement un trade ARIA dans le wallet user"""
+    try:
+        action   = trade["type"]           # BUY / SELL / SHORT / COVER
+        asset_key= trade["asset"].lower().replace(" ","").replace("₿","btc").split("(")[0].strip()
+        # Normalise vers les clés AI_TRADABLE
+        key_map  = {"bitcoin":"btc","ethereum":"eth","nvidia":"nvda","tesla":"tsla",
+                    "apple":"aapl","meta":"meta","amazon":"amzn","microsoft":"msft",
+                    "solana":"sol","binancecoin":"bnb","gold":"gold","sp500":"sp500"}
+        for long_name, short_key in key_map.items():
+            if long_name in asset_key or short_key == asset_key:
+                asset_key = short_key; break
+        # Retrouve le ticker via AI_TRADABLE
+        asset_info = AI_TRADABLE.get(asset_key)
+        if not asset_info: return
+        ticker, name = asset_info
+        price   = trade["price"]
+        # Proportion: même % du wallet que ARIA
+        pct     = trade["amount"] / aria_wallet_size if aria_wallet_size > 0 else 0.05
+        amount  = uw_total_value(uw) * pct
+        amount  = min(amount, uw["balance"])
+        if amount < 5: return
+        portfolio = uw.get("portfolio", {})
+        now_str   = now_paris().strftime("%d/%m/%Y %H:%M")
+        pnl = 0; pnl_pct = 0
+        executed = None
+        if action == "BUY":
+            if asset_key in portfolio: return
+            qty = amount / price
+            portfolio[asset_key] = {"qty":qty,"buy_price":price,"name":name,"ticker":ticker,"type":"LONG","date":now_str}
+            uw["balance"] -= amount
+            executed = {"date":now_str,"type":"BUY","asset":name,"price":price,"qty":qty,"amount":amount,"pnl":0,"pnl_pct":0,"reason":f"📋 Copy ARIA","conviction":trade.get("conviction",50),"short":False}
+        elif action == "SELL" and asset_key in portfolio:
+            pos = portfolio.pop(asset_key)
+            proceeds = pos["qty"] * price
+            pnl = proceeds - pos["buy_price"] * pos["qty"]
+            pnl_pct = pnl / (pos["buy_price"] * pos["qty"]) * 100 if pos["qty"] > 0 else 0
+            uw["balance"] += proceeds
+            uw["winning_trades"] += int(pnl >= 0)
+            executed = {"date":now_str,"type":"SELL","asset":name,"price":price,"qty":pos["qty"],"amount":proceeds,"pnl":pnl,"pnl_pct":pnl_pct,"reason":"📋 Copy ARIA","conviction":100,"short":False}
+        elif action == "SHORT":
+            sk = f"{asset_key}_short"
+            if sk in portfolio: return
+            qty = amount / price
+            portfolio[sk] = {"qty":qty,"buy_price":price,"name":name,"ticker":ticker,"type":"SHORT","date":now_str}
+            uw["balance"] -= amount
+            executed = {"date":now_str,"type":"SHORT","asset":name,"price":price,"qty":qty,"amount":amount,"pnl":0,"pnl_pct":0,"reason":"📋 Copy ARIA","conviction":trade.get("conviction",50),"short":True}
+        elif action == "COVER":
+            sk = f"{asset_key}_short"
+            if sk not in portfolio: return
+            pos = portfolio.pop(sk)
+            pnl = (pos["buy_price"] - price) * pos["qty"]
+            proceeds = pos["qty"] * pos["buy_price"] + pnl
+            pnl_pct = pnl / (pos["buy_price"] * pos["qty"]) * 100 if pos["qty"] > 0 else 0
+            uw["balance"] += proceeds
+            uw["winning_trades"] += int(pnl >= 0)
+            executed = {"date":now_str,"type":"COVER","asset":name,"price":price,"qty":pos["qty"],"amount":proceeds,"pnl":pnl,"pnl_pct":pnl_pct,"reason":"📋 Copy ARIA","conviction":100,"short":True}
+        if executed:
+            uw["portfolio"] = portfolio
+            uw["total_trades"] = uw.get("total_trades",0) + 1
+            uw["history"].append(executed)
+            # snapshot perf
+            tv = uw_total_value(uw)
+            uw.setdefault("perf_history",[]).append({"d":now_str[:10],"v":round(tv,2)})
+            if len(uw["perf_history"]) > 200: uw["perf_history"] = uw["perf_history"][-200:]
+    except Exception as e:
+        print(f"Copy trade error user {chat_id}: {e}")
+
+def run_copy_trading(all_trades, aria_wallet_size):
+    """Applique les trades ARIA à tous les users avec copy_trading=True"""
+    if not all_trades: return
+    try:
+        wallets = load_user_wallets()
+        changed = {}
+        for sid, uw in wallets.items():
+            if not uw.get("copy_trading"): continue
+            if not is_premium(int(sid)): continue
+            for trade in all_trades:
+                _copy_trade_for_user(int(sid), uw, trade, aria_wallet_size)
+            changed[sid] = uw
+        for sid, uw in changed.items():
+            wallets[sid] = uw
+        if changed:
+            save_user_wallets(wallets)
+            print(f"Copy trading: {len(changed)} wallets mis à jour")
+    except Exception as e:
+        print(f"Copy trading global error: {e}")
+
+# ── Telegram commands ──
+def cmd_mon_wallet(chat_id):
+    if not is_premium(chat_id): return premium_lock(chat_id)
+    uw    = get_user_wallet(chat_id)
+    total = uw_total_value(uw)
+    pnl, pnl_pct = uw_pnl(uw)
+    e = "🟢" if pnl >= 0 else "🔴"
+    copy_status = "✅ Activé" if uw.get("copy_trading") else "⏸️ Désactivé"
+    win_rate = (uw["winning_trades"] / uw["total_trades"] * 100) if uw.get("total_trades",0) > 0 else 0
+    lines = [
+        "💼 *MON WALLET VIRTUEL*",
+        "━━━━━━━━━━━━━━━━━━━━",
+        f"💰 Valeur totale : *{total:,.2f}$*",
+        f"📈 P&L : {e} *{pnl:+,.2f}$ ({pnl_pct:+.1f}%)*",
+        f"💵 Cash dispo : *{uw['balance']:,.2f}$*",
+        f"📊 Trades : *{uw.get('total_trades',0)}* | WinRate : *{win_rate:.0f}%*",
+        f"🤖 Copy ARIA : *{copy_status}*",
+        "",
+    ]
+    portfolio = uw.get("portfolio", {})
+    if portfolio:
+        lines.append("*Positions ouvertes :*")
+        for key, pos in portfolio.items():
+            price = get_asset_price(pos["ticker"]) or pos["buy_price"]
+            is_s  = pos.get("type") == "SHORT"
+            pp    = ((pos["buy_price"] - price) if is_s else (price - pos["buy_price"])) / pos["buy_price"] * 100
+            tag   = " _(short)_" if is_s else ""
+            ep    = "🟢" if pp >= 0 else "🔴"
+            lines.append(f"  {ep} *{pos['name']}*{tag} @ {pos['buy_price']:,.2f}$ → {pp:+.1f}%")
+    else:
+        lines.append("_Aucune position ouverte._")
+    lines += ["", f"🔑 *Token dashboard :* `{uw['token']}`"]
+    send_message(chat_id, "\n".join(lines), reply_markup={"inline_keyboard": [
+        [{"text": "🤖 Copy ARIA ON/OFF", "callback_data": "/copytrade_toggle"}],
+        [{"text": "📈 Acheter", "callback_data": "/uw_buy"},
+         {"text": "📉 Vendre",  "callback_data": "/uw_sell"}],
+        [{"text": "📜 Historique", "callback_data": "/uw_history"}],
+        [{"text": "🔙 Menu", "callback_data": "/menu_retour"}],
+    ]})
+
+def cmd_copytrade_toggle(chat_id):
+    if not is_premium(chat_id): return premium_lock(chat_id)
+    uw = get_user_wallet(chat_id)
+    uw["copy_trading"] = not uw.get("copy_trading", False)
+    save_user_wallet(chat_id, uw)
+    status = "✅ *Copy trading ACTIVÉ !*\nTu copieras automatiquement chaque trade d'ARIA." \
+             if uw["copy_trading"] else \
+             "⏸️ *Copy trading désactivé.*\nTu ne copieras plus les trades d'ARIA."
+    send_message(chat_id, status, reply_markup={"inline_keyboard": [
+        [{"text": "💼 Mon wallet", "callback_data": "/mon_wallet"}],
+        [{"text": "🔙 Menu", "callback_data": "/menu_retour"}],
+    ]})
+
+def cmd_uw_history(chat_id):
+    if not is_premium(chat_id): return premium_lock(chat_id)
+    uw = get_user_wallet(chat_id)
+    hist = uw.get("history", [])[-10:][::-1]
+    if not hist:
+        send_message(chat_id, "Aucun trade dans ton historique.", reply_markup={"inline_keyboard":[[{"text":"🔙","callback_data":"/mon_wallet"}]]})
+        return
+    icons = {"BUY":"📥","SELL":"📤","SHORT":"🔻","COVER":"🔼"}
+    lines = ["📜 *MES 10 DERNIERS TRADES*\n"]
+    for t in hist:
+        ic = icons.get(t["type"],"•")
+        pnl_str = f" | *{t['pnl_pct']:+.1f}%*" if t["type"] in ["SELL","COVER"] else ""
+        lines.append(f"{ic} *{t['type']} {t['asset']}* @ {t['price']:,.2f}${pnl_str}")
+        lines.append(f"   _{t.get('reason','')[:60]}_ — {t.get('date','')[:10]}")
+    send_message(chat_id, "\n".join(lines), reply_markup={"inline_keyboard":[[{"text":"🔙 Wallet","callback_data":"/mon_wallet"}]]})
+
+# Assets disponibles pour trades manuels (même univers que ARIA)
+UW_ASSETS_MENU = [
+    ("₿ BTC",  "btc"),  ("🔷 ETH",  "eth"),  ("🟢 NVDA", "nvda"),
+    ("🚗 TSLA","tsla"), ("🍎 AAPL", "aapl"), ("📘 META", "meta"),
+    ("📦 AMZN","amzn"), ("🔵 MSFT", "msft"), ("🥇 Gold", "gold"),
+]
+
+def cmd_uw_buy_menu(chat_id):
+    if not is_premium(chat_id): return premium_lock(chat_id)
+    send_message(chat_id, "📈 *ACHETER — Quel actif ?*",
+        reply_markup={"inline_keyboard":
+            [[{"text":name,"callback_data":f"/uw_buy_asset {key}"}] for name,key in UW_ASSETS_MENU] +
+            [[{"text":"🔙","callback_data":"/mon_wallet"}]]})
+
+def cmd_uw_sell_menu(chat_id):
+    if not is_premium(chat_id): return premium_lock(chat_id)
+    uw = get_user_wallet(chat_id)
+    portfolio = uw.get("portfolio",{})
+    if not portfolio:
+        send_message(chat_id,"Aucune position à vendre.",reply_markup={"inline_keyboard":[[{"text":"🔙","callback_data":"/mon_wallet"}]]})
+        return
+    btns = [[{"text":f"🔴 Vendre {pos['name']}","callback_data":f"/uw_sell_asset {k}"}] for k,pos in portfolio.items()]
+    btns.append([{"text":"🔙","callback_data":"/mon_wallet"}])
+    send_message(chat_id,"📉 *VENDRE — Quelle position ?*",reply_markup={"inline_keyboard":btns})
+
+def cmd_uw_buy_asset(chat_id, asset_key):
+    if not is_premium(chat_id): return premium_lock(chat_id)
+    set_user_field(chat_id, "sav_motif", f"[UW_BUY_{asset_key.upper()}]")
+    uw = get_user_wallet(chat_id)
+    send_message(chat_id,
+        f"💰 *Cash disponible :* {uw['balance']:,.2f}$\n\n"
+        f"Combien veux-tu investir dans *{asset_key.upper()}* ? (en $)\n"
+        f"_Ex: 500_ (min 10$)",
+        reply_markup={"inline_keyboard":[[{"text":"Annuler","callback_data":"/mon_wallet"}]]})
+
+def cmd_uw_sell_asset(chat_id, pos_key):
+    if not is_premium(chat_id): return premium_lock(chat_id)
+    uw = get_user_wallet(chat_id)
+    portfolio = uw.get("portfolio",{})
+    if pos_key not in portfolio:
+        send_message(chat_id,"Position introuvable.",reply_markup={"inline_keyboard":[[{"text":"🔙","callback_data":"/mon_wallet"}]]})
+        return
+    pos = portfolio[pos_key]
+    price = get_asset_price(pos["ticker"]) or pos["buy_price"]
+    is_s  = pos.get("type")=="SHORT"
+    pp    = ((pos["buy_price"]-price) if is_s else (price-pos["buy_price"])) / pos["buy_price"] * 100
+    proceeds = pos["qty"] * pos["buy_price"] + (pos["buy_price"]-price)*pos["qty"] if is_s else pos["qty"]*price
+    pnl      = proceeds - pos["buy_price"]*pos["qty"] if not is_s else (pos["buy_price"]-price)*pos["qty"]
+    ep = "🟢" if pnl >= 0 else "🔴"
+    portfolio.pop(pos_key)
+    uw["portfolio"] = portfolio
+    uw["balance"] += proceeds
+    uw["total_trades"] = uw.get("total_trades",0)+1
+    uw["winning_trades"] = uw.get("winning_trades",0)+int(pnl>=0)
+    now_str = now_paris().strftime("%d/%m/%Y %H:%M")
+    uw.setdefault("history",[]).append({"date":now_str,"type":"COVER" if is_s else "SELL","asset":pos["name"],"price":price,"qty":pos["qty"],"amount":proceeds,"pnl":pnl,"pnl_pct":pp,"reason":"Vente manuelle","conviction":100,"short":is_s})
+    tv = uw_total_value(uw)
+    uw.setdefault("perf_history",[]).append({"d":now_str[:10],"v":round(tv,2)})
+    save_user_wallet(chat_id, uw)
+    send_message(chat_id,
+        f"{ep} *Vente exécutée !*\n\n"
+        f"Actif : *{pos['name']}*\n"
+        f"Prix : *{price:,.2f}$*\n"
+        f"P&L : {ep} *{pnl:+,.2f}$ ({pp:+.1f}%)*\n"
+        f"Cash : *{uw['balance']:,.2f}$*",
+        reply_markup={"inline_keyboard":[[{"text":"💼 Mon wallet","callback_data":"/mon_wallet"}]]})
+
+def parse_uw_buy(chat_id, text):
+    """Parse le montant saisi après cmd_uw_buy_asset"""
+    user = get_user(chat_id)
+    motif = user.get("sav_motif","")
+    if not motif.startswith("[UW_BUY_"): return False
+    asset_key = motif.replace("[UW_BUY_","").replace("]","").lower()
+    try: amount = float(text.strip().replace("$","").replace(",","."))
+    except: send_message(chat_id,"Montant invalide. Entre un nombre ex: 500"); return True
+    if amount < 10:
+        send_message(chat_id,"Minimum 10$."); return True
+    asset_info = AI_TRADABLE.get(asset_key)
+    if not asset_info:
+        send_message(chat_id,"Actif inconnu."); set_user_field(chat_id,"sav_motif",""); return True
+    ticker, name = asset_info
+    price = get_asset_price(ticker)
+    if not price:
+        send_message(chat_id,"Prix indisponible, réessaie."); set_user_field(chat_id,"sav_motif",""); return True
+    uw = get_user_wallet(chat_id)
+    if amount > uw["balance"]:
+        send_message(chat_id,f"Solde insuffisant ({uw['balance']:,.2f}$ dispo)."); return True
+    if asset_key in uw.get("portfolio",{}):
+        send_message(chat_id,f"Tu as déjà une position sur {name}."); set_user_field(chat_id,"sav_motif",""); return True
+    qty = amount / price
+    now_str = now_paris().strftime("%d/%m/%Y %H:%M")
+    uw.setdefault("portfolio",{})[asset_key] = {"qty":qty,"buy_price":price,"name":name,"ticker":ticker,"type":"LONG","date":now_str}
+    uw["balance"] -= amount
+    uw["total_trades"] = uw.get("total_trades",0)+1
+    uw.setdefault("history",[]).append({"date":now_str,"type":"BUY","asset":name,"price":price,"qty":qty,"amount":amount,"pnl":0,"pnl_pct":0,"reason":"Achat manuel","conviction":50,"short":False})
+    tv = uw_total_value(uw)
+    uw.setdefault("perf_history",[]).append({"d":now_str[:10],"v":round(tv,2)})
+    save_user_wallet(chat_id, uw)
+    set_user_field(chat_id,"sav_motif","")
+    send_message(chat_id,
+        f"✅ *Achat exécuté !*\n\n"
+        f"Actif : *{name}*\n"
+        f"Prix d'entrée : *{price:,.2f}$*\n"
+        f"Quantité : *{qty:.6f}*\n"
+        f"Investi : *{amount:,.2f}$*\n"
+        f"Cash restant : *{uw['balance']:,.2f}$*",
+        reply_markup={"inline_keyboard":[[{"text":"💼 Mon wallet","callback_data":"/mon_wallet"}]]})
+    return True
+
+# ════════════════════════════════════════════════════════════════
+# FLASK API — dashboard web
+# ════════════════════════════════════════════════════════════════
+def _start_api_server():
+    try:
+        from flask import Flask, jsonify, request
+        from flask_cors import CORS
+    except ImportError:
+        try:
+            import subprocess, sys
+            subprocess.check_call([sys.executable,"-m","pip","install","flask","flask-cors","--break-system-packages","-q"])
+            from flask import Flask, jsonify, request
+            from flask_cors import CORS
+        except Exception as e:
+            print(f"Flask non disponible: {e}"); return
+
+    app = Flask(__name__)
+    CORS(app)
+        # ─── DASHBOARD HTML (servi directement) ───
+    
+    @app.route("/")
+    def dashboard():
+        try:
+            with open("dashboard.html", "r", encoding="utf-8") as f:
+                return f.read(), 200, {"Content-Type": "text/html"}
+        except FileNotFoundError:
+            return "<h1>dashboard.html manquant dans le repo</h1>", 404
+
+    @app.route("/api/aria")
+    def api_aria():
+        try:
+            w = load_ai_wallet()
+            total = ai_wallet_total_value(w)
+            pnl, pnl_pct = ai_wallet_pnl(w)
+            positions = []
+            for key, pos in w.get("portfolio",{}).items():
+                price = get_asset_price(pos["ticker"]) or pos["buy_price"]
+                is_s  = pos.get("type")=="SHORT"
+                pp    = ((pos["buy_price"]-price) if is_s else (price-pos["buy_price"])) / pos["buy_price"] * 100
+                positions.append({"key":key,"name":pos["name"],"type":pos.get("type","LONG"),"qty":pos["qty"],"buy_price":pos["buy_price"],"current_price":price,"pnl_pct":round(pp,2),"value":round(pos["qty"]*price,2),"date":pos.get("date","")})
+            return jsonify({
+                "balance": round(w["balance"],2),
+                "total_value": round(total,2),
+                "pnl": round(pnl,2),
+                "pnl_pct": round(pnl_pct,2),
+                "total_trades": w.get("total_trades",0),
+                "winning_trades": w.get("winning_trades",0),
+                "win_rate": round(w["winning_trades"]/w["total_trades"]*100,1) if w.get("total_trades",0)>0 else 0,
+                "created": w.get("created",""),
+                "last_trade": w.get("last_trade",""),
+                "positions": positions,
+                "history": w.get("history",[])[-50:][::-1],
+                "perf_history": _build_perf_history(w),
+            })
+        except Exception as e:
+            return jsonify({"error":str(e)}), 500
+
+    @app.route("/api/wallet")
+    def api_wallet():
+        token = request.args.get("token","").upper()
+        if not token: return jsonify({"error":"token required"}), 400
+        wallets = load_user_wallets()
+        uw = next((w for w in wallets.values() if w.get("token","").upper()==token), None)
+        if not uw: return jsonify({"error":"wallet not found"}), 404
+        total = uw_total_value(uw)
+        pnl, pnl_pct = uw_pnl(uw)
+        positions = []
+        for key, pos in uw.get("portfolio",{}).items():
+            price = get_asset_price(pos["ticker"]) or pos["buy_price"]
+            is_s  = pos.get("type")=="SHORT"
+            pp    = ((pos["buy_price"]-price) if is_s else (price-pos["buy_price"])) / pos["buy_price"] * 100
+            positions.append({"key":key,"name":pos["name"],"type":pos.get("type","LONG"),"qty":pos["qty"],"buy_price":pos["buy_price"],"current_price":price,"pnl_pct":round(pp,2),"value":round(pos["qty"]*price,2),"date":pos.get("date","")})
+        return jsonify({
+            "name": uw.get("name",""),
+            "balance": round(uw["balance"],2),
+            "total_value": round(total,2),
+            "pnl": round(pnl,2),
+            "pnl_pct": round(pnl_pct,2),
+            "copy_trading": uw.get("copy_trading",False),
+            "total_trades": uw.get("total_trades",0),
+            "win_rate": round(uw.get("winning_trades",0)/uw.get("total_trades",1)*100,1) if uw.get("total_trades",0)>0 else 0,
+            "positions": positions,
+            "history": uw.get("history",[])[-30:][::-1],
+            "perf_history": uw.get("perf_history",[]),
+        })
+
+    @app.route("/api/leaderboard")
+    def api_leaderboard():
+        wallets = load_user_wallets()
+        board = []
+        for sid, uw in wallets.items():
+            total = uw_total_value(uw)
+            pnl_pct = (total - UW_INITIAL) / UW_INITIAL * 100
+            board.append({"name": uw.get("name","User")[:12], "pnl_pct": round(pnl_pct,2), "total_value": round(total,2), "copy_trading": uw.get("copy_trading",False)})
+        board.sort(key=lambda x: x["pnl_pct"], reverse=True)
+        return jsonify(board[:20])
+
+    @app.route("/health")
+    def health(): return "ok"
+
+    port = int(os.environ.get("PORT", 8080))
+    print(f"🌐 API démarrée sur le port {port}")
+    app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
+
+def _build_perf_history(w):
+    """Reconstruit l'historique de perf ARIA depuis l'historique des trades"""
+    h = w.get("history",[])
+    if not h: return [{"d": w.get("created","today"), "v": AI_WALLET_INITIAL}]
+    points = [{"d": w.get("created",""), "v": AI_WALLET_INITIAL}]
+    balance = AI_WALLET_INITIAL
+    for t in h:
+        if t["type"] in ["SELL","COVER"]:
+            balance += t.get("pnl",0)
+        points.append({"d": t.get("date","")[:10], "v": round(balance,2)})
+    return points[-100:]
+
 # ================== ROUTING ==================
 def handle_command(chat_id, text, user_name=""):
     t_low = text.strip().lower()
@@ -2846,6 +3292,11 @@ def handle_command(chat_id, text, user_name=""):
         user = get_user(chat_id)
         motif = user.get("sav_motif", "")
 
+        # User wallet buy order
+        if motif.startswith("[UW_BUY_"):
+            if parse_uw_buy(chat_id, text):
+                return
+
         # Paper trading orders
         if motif in ["[PAPER_BUY]", "[PAPER_SELL]"] or t_low.startswith(("buy ","sell ")):
             if parse_paper_order(chat_id, text):
@@ -2880,6 +3331,8 @@ def get_updates(offset=None):
 print("🤖 Bot démarré !")
 print("Fonctionnalités : Signaux(14) • RSI(9) • Paper Trading • Alertes • Score • Hebdo • Langues(FR/EN/ES)")
 
+# Préchauffage du cache + démarrage API web
+threading.Thread(target=_start_api_server, daemon=True).start()
 # Préchauffage du cache au démarrage (en arrière-plan — bot réactif immédiatement)
 print("Préchauffage cache news+marché en arrière-plan...")
 threading.Thread(target=_do_refresh_cache, daemon=True).start()
