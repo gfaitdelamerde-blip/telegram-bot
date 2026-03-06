@@ -609,26 +609,33 @@ def menu_paper(chat_id):
     ]}
 
 # ================== DONNÉES MARCHÉ ==================
-# Cache global pour eviter les doubles appels API
-_news_cache = {}          # {index: {title, description, url}}
-_news_list_cache = []     # liste strings pour les prompts
-_market_cache = ""        # string marché formatée
-_cache_ts = 0             # timestamp dernière mise à jour (seconds)
-_CACHE_TTL = 300          # 5 minutes
+# ============================================================
+# Cache global — rafraîchi en arrière-plan uniquement
+# Les threads utilisateurs lisent instantanément, sans jamais attendre
+# ============================================================
+_news_cache = {}
+_news_list_cache = []
+_market_cache = ""
+_price_cache = {}         # {ticker: float} — prix unitaires
+_cache_ts = 0
+_CACHE_TTL = 300          # 5 min
+_cache_lock = threading.Lock()
+_cache_refreshing = False  # évite les doubles refreshs simultanés
 
-def _refresh_cache_if_needed():
-    """Rafraichit news+market en un seul appel si le cache est trop vieux"""
-    global _news_list_cache, _market_cache, _cache_ts
+def _do_refresh_cache():
+    """Appelé UNIQUEMENT en arrière-plan — ne jamais appeler depuis un thread user"""
+    global _news_cache, _news_list_cache, _market_cache, _price_cache, _cache_ts, _cache_refreshing
     import time as _time
-    if _time.time() - _cache_ts < _CACHE_TTL and _news_list_cache and _market_cache:
-        return
+    if _cache_refreshing:
+        return  # déjà en cours
+    _cache_refreshing = True
     try:
-        # News
+        # 1. News
         articles = []
         url_api = "https://newsapi.org/v2/top-headlines"
         for params in [
             {"apiKey": NEWSAPI_KEY, "pageSize": 10, "category": "business", "language": "en"},
-            {"apiKey": NEWSAPI_KEY, "pageSize": 8, "category": "general", "language": "fr", "country": "fr"},
+            {"apiKey": NEWSAPI_KEY, "pageSize": 8,  "category": "general",  "language": "fr", "country": "fr"},
         ]:
             try:
                 r = requests.get(url_api, params=params, timeout=8)
@@ -636,42 +643,60 @@ def _refresh_cache_if_needed():
                     articles.extend(r.json().get("articles", []))
             except: pass
         valid = [a for a in articles[:12] if a.get("title") and a.get("description")]
-        global _news_cache
-        _news_cache = {str(i): {"title": a["title"], "description": a.get("description",""), "url": a.get("url","")} for i, a in enumerate(valid)}
-        _news_list_cache = [f"- {a['title']} : {a.get('description','')[:150]}..." for a in valid]
-        # Marché
+        with _cache_lock:
+            _news_cache = {str(i): {"title": a["title"], "description": a.get("description",""), "url": a.get("url","")} for i, a in enumerate(valid)}
+            _news_list_cache = [f"- {a['title']} : {a.get('description','')[:150]}..." for a in valid]
+
+        # 2. Marché (yfinance — lent, fait séparément)
         try:
-            data = yf.download(TICKERS, period="2d", interval="1d", progress=False, timeout=10)["Close"]
-            latest = data.iloc[-1]
-            chg = data.pct_change().iloc[-1] * 100
-            mapping = {"BTC-USD":"₿ Bitcoin","ETH-USD":"🔷 Ethereum","GC=F":"🥇 Or","^GSPC":"📈 S&P 500","^DJI":"📊 Dow Jones","^IXIC":"💻 Nasdaq","AAPL":"🍎 Apple","MSFT":"🔵 Microsoft","NVDA":"🟢 Nvidia","TSLA":"🚗 Tesla","AMZN":"📦 Amazon"}
-            lines = []
+            MKTMAP = {"BTC-USD":"₿ Bitcoin","ETH-USD":"🔷 Ethereum","GC=F":"🥇 Or",
+                      "^GSPC":"📈 S&P 500","^DJI":"📊 Dow Jones","^IXIC":"💻 Nasdaq",
+                      "AAPL":"🍎 Apple","MSFT":"🔵 Microsoft","NVDA":"🟢 Nvidia",
+                      "TSLA":"🚗 Tesla","AMZN":"📦 Amazon"}
+            data = yf.download(TICKERS, period="2d", interval="1d", progress=False)["Close"]
+            latest = data.iloc[-1]; chg = data.pct_change().iloc[-1] * 100
+            lines = []; prices = {}
             for tk in TICKERS:
                 try:
                     c = float(chg[tk]); p = float(latest[tk])
-                    e = "🟢" if c >= 0 else "🔴"
-                    lines.append(f"{e} *{mapping.get(tk,tk)}*: {p:,.2f} ({c:+.2f}%)")
+                    lines.append(f"{'🟢' if c >= 0 else '🔴'} *{MKTMAP.get(tk,tk)}*: {p:,.2f} ({c:+.2f}%)")
+                    prices[tk] = p
                 except: pass
-            _market_cache = "\n".join(lines)
+            with _cache_lock:
+                _market_cache = "\n".join(lines)
+                _price_cache.update(prices)
         except Exception as e:
             print(f"Cache marché: {e}")
+
         _cache_ts = _time.time()
-        print(f"Cache rafraichi: {len(_news_list_cache)} news, {len(_market_cache)} chars marché")
+        print(f"Cache OK: {len(_news_list_cache)} news | {len(_market_cache)} chars")
     except Exception as e:
-        print(f"Erreur refresh cache: {e}")
+        print(f"Erreur cache: {e}")
+    finally:
+        _cache_refreshing = False
+
+def _refresh_cache_if_needed():
+    """Lance un refresh en arrière-plan si le cache est périmé — RETOURNE IMMÉDIATEMENT"""
+    import time as _time
+    if _time.time() - _cache_ts < _CACHE_TTL and _news_list_cache:
+        return  # cache frais, rien à faire
+    threading.Thread(target=_do_refresh_cache, daemon=True).start()
 
 def get_news():
-    _refresh_cache_if_needed()
-    return _news_list_cache or ["Pas d'actualites disponibles"]
+    """Retourne les news du cache — déclenche un refresh bg si périmé"""
+    _refresh_cache_if_needed()  # lance en bg si besoin, retour immédiat
+    with _cache_lock:
+        return list(_news_list_cache) if _news_list_cache else ["Marché : données en cours de chargement..."]
 
 def get_news_with_buttons():
-    """Retourne les news avec boutons En savoir plus — utilise le cache"""
+    """Retourne les boutons news — utilise le cache instantanément"""
     _refresh_cache_if_needed()
     keyboard = []
-    for i, art in _news_cache.items():
-        title = art["title"][:80]
-        keyboard.append([{"text": f"🔍 {title[:40]}...", "callback_data": f"/news_deep {i}"}])
-    return "", keyboard  # le texte du résumé est géré séparément
+    with _cache_lock:
+        for i, art in _news_cache.items():
+            title = art["title"][:80]
+            keyboard.append([{"text": f"🔍 {title[:40]}...", "callback_data": f"/news_deep {i}"}])
+    return "", keyboard
 
 def cmd_news_deep(chat_id, idx_str):
     """Analyse approfondie d'une news avec Groq"""
@@ -705,38 +730,71 @@ Format téléphone, utilise des emojis, max 400 mots."""
         send_message(chat_id, "Erreur lors de l'analyse. Réessaie.")
 
 def get_market_data():
-    _refresh_cache_if_needed()
-    return _market_cache or "Données marché indisponibles"
+    _refresh_cache_if_needed()  # lance en bg si périmé, retour immédiat
+    with _cache_lock:
+        return _market_cache if _market_cache else "Données marché en cours..."
 
 def get_asset_price(ticker):
+    """Retourne le prix — priorité au cache marché, sinon yf.fast_info"""
+    # 1. Prix dans le cache (mis à jour toutes les 5 min)
+    if ticker in _price_cache:
+        return _price_cache[ticker]
+    # 2. Fallback: yf.fast_info (beaucoup plus rapide que yf.download)
+    try:
+        info = yf.Ticker(ticker).fast_info
+        price = getattr(info, 'last_price', None) or getattr(info, 'regularMarketPrice', None)
+        if price:
+            _price_cache[ticker] = float(price)
+            return float(price)
+    except: pass
+    # 3. Fallback final: yf.download
     try:
         data = yf.download(ticker, period="2d", interval="1d", progress=False)["Close"]
         vals = [float(v) for v in data.values.flatten() if str(v) != 'nan']
-        return vals[-1] if vals else None
-    except:
-        return None
+        if vals:
+            _price_cache[ticker] = vals[-1]
+            return vals[-1]
+    except: pass
+    return None
 
 def get_asset_data(ticker, period="5d"):
     data = yf.download(ticker, period=period, interval="1d", progress=False)["Close"]
     return [float(v) for v in data.dropna().values.flatten() if str(v) != 'nan']
 
+# Cache RSI par ticker (valable 30 min)
+_rsi_cache = {}  # {ticker: (value, timestamp)}
+_RSI_TTL = 1800  # 30 min
+
 def compute_rsi(ticker, period=14):
-    data = yf.download(ticker, period="60d", interval="1d", auto_adjust=True, progress=False)
-    if data.empty:
+    import time as _t
+    # Retourne le RSI depuis le cache si récent
+    if ticker in _rsi_cache:
+        cached_val, cached_ts = _rsi_cache[ticker]
+        if _t.time() - cached_ts < _RSI_TTL:
+            return cached_val
+    try:
+        data = yf.download(ticker, period="60d", interval="1d", auto_adjust=True, progress=False)
+        if data.empty:
+            return None
+        close = data["Close"]
+        if hasattr(close, "columns"):
+            close = close.iloc[:, 0]
+        close = pd.Series([float(v) for v in close.values.flatten()], index=close.index).dropna()
+        if len(close) < period:
+            return None
+        delta = close.diff()
+        avg_gain = delta.clip(lower=0).rolling(window=period).mean()
+        avg_loss = (-delta.clip(upper=0)).rolling(window=period).mean()
+        rs = avg_gain / avg_loss
+        rsi = 100 - (100 / (1 + rs))
+        val = float(rsi.iloc[-1])
+        result = None if pd.isna(val) else val
+        if result is not None:
+            _rsi_cache[ticker] = (result, _t.time())
+        return result
+    except Exception as e:
+        print(f"RSI error {ticker}: {e}")
         return None
-    close = data["Close"]
-    if hasattr(close, "columns"):
-        close = close.iloc[:, 0]
-    close = pd.Series([float(v) for v in close.values.flatten()], index=close.index).dropna()
-    if len(close) < period:
-        return None
-    delta = close.diff()
-    avg_gain = delta.clip(lower=0).rolling(window=period).mean()
-    avg_loss = (-delta.clip(upper=0)).rolling(window=period).mean()
-    rs = avg_gain / avg_loss
-    rsi = 100 - (100 / (1 + rs))
-    val = float(rsi.iloc[-1])
-    return None if pd.isna(val) else val
 
 def get_top5():
     tickers = ["AAPL","MSFT","NVDA","TSLA","AMZN","GOOGL","META","AMD","NFLX","ORCL"]
@@ -2600,7 +2658,7 @@ def check_auto_send():
         except Exception as e:
             print(f"Erreur alertes: {e}")
         # Pre-chauffe le cache en arrière-plan
-        threading.Thread(target=_refresh_cache_if_needed, daemon=True).start()
+        threading.Thread(target=_do_refresh_cache, daemon=True).start()
 
     # Mouvements forts >5% (toutes les 30 min)
     if now.second < 5 and now.minute % 30 == 0:
@@ -2779,6 +2837,10 @@ def get_updates(offset=None):
 print("🤖 Bot démarré !")
 print("Fonctionnalités : Signaux(14) • RSI(9) • Paper Trading • Alertes • Score • Hebdo • Langues(FR/EN/ES)")
 
+# Préchauffage du cache au démarrage (en arrière-plan — bot réactif immédiatement)
+print("Préchauffage cache news+marché en arrière-plan...")
+threading.Thread(target=_do_refresh_cache, daemon=True).start()
+
 offset = None
 while True:
     try:
@@ -2805,4 +2867,3 @@ while True:
     except Exception as e:
         print(f"Erreur boucle: {e}")
         time.sleep(5)
-    
