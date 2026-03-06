@@ -32,6 +32,22 @@ PAYMENT_LINK_ANNUEL = "https://paypal.me/tonnom/79.99EUR"
 PRICE_TRACKING_FILE = "price_tracking.json"   # suivi des prix pour alertes mouvement fort
 LESSON_SENT_FILE    = "lesson_sent.json"       # suivi leçons hebdo déjà envoyées
 USERS_FILE   = "users.json"
+USER_WALLETS_FILE = "user_wallets.json"
+UW_INITIAL        = 10000
+
+# Assets disponibles pour les trades du wallet user
+AI_TRADABLE = {
+    "btc":  ("BTC-USD", "Bitcoin"),
+    "eth":  ("ETH-USD", "Ethereum"),
+    "sol":  ("SOL-USD", "Solana"),
+    "nvda": ("NVDA",    "Nvidia"),
+    "tsla": ("TSLA",    "Tesla"),
+    "aapl": ("AAPL",    "Apple"),
+    "msft": ("MSFT",    "Microsoft"),
+    "amzn": ("AMZN",    "Amazon"),
+    "meta": ("META",    "Meta"),
+    "gold": ("GC=F",    "Gold"),
+}
 
 TICKERS = ["BTC-USD","ETH-USD","GC=F","^GSPC","^DJI","^IXIC","AAPL","MSFT","NVDA","TSLA","AMZN"]
 
@@ -3209,6 +3225,7 @@ def handle_command(chat_id, text, user_name=""):
     elif t_low == "/chance":                 cmd_chance(chat_id)
     elif t_low == "/quote":                  cmd_quote(chat_id)
     elif t_low == "/aiwallet":                cmd_ai_wallet(chat_id)
+    elif t_low == "/mon_wallet":                cmd_mon_wallet(chat_id)
     elif t_low == "/score":                  cmd_score(chat_id)
     elif t_low == "/performance":            cmd_performance(chat_id)
     elif t_low == "/avis":                   cmd_avis(chat_id, user_name)
