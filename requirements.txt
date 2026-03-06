@@ -7,3 +7,5 @@ python-dotenv
 pyTelegramBotAPI
 flask
 pytz
+flask
+flask-cors
