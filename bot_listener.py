@@ -27,7 +27,10 @@ TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 GROQ_MODEL   = "llama-3.3-70b-versatile"
 PAYMENT_LINK = "https://paypal.me/tonnom/9.99EUR"
 PRIX_MENSUEL = "9.99€"
-PRIX_ANNUEL  = "79.99€"
+PRIX_ANNUEL        = "79.99€"
+PAYMENT_LINK_ANNUEL = "https://paypal.me/tonnom/79.99EUR"
+PRICE_TRACKING_FILE = "price_tracking.json"   # suivi des prix pour alertes mouvement fort
+LESSON_SENT_FILE    = "lesson_sent.json"       # suivi leçons hebdo déjà envoyées
 USERS_FILE   = "users.json"
 
 TICKERS = ["BTC-USD","ETH-USD","GC=F","^GSPC","^DJI","^IXIC","AAPL","MSFT","NVDA","TSLA","AMZN"]
@@ -558,6 +561,7 @@ def menu_outils():
         [{"text": "🔔 Mes Alertes",        "callback_data": "/menu_alertes"}],
         [{"text": "📊 Paper Trading",      "callback_data": "/menu_paper"}],
         [{"text": "📅 Score Marché",       "callback_data": "/score"}],
+        [{"text": "📚 Leçon du moment",    "callback_data": "/lecon"}],
         [{"text": "📈 Ma Performance",     "callback_data": "/performance"}],
         [{"text": "⭐ Donner un avis",     "callback_data": "/avis"}],
         [{"text": "🔙 Retour",            "callback_data": "/menu_retour"}],
@@ -567,6 +571,8 @@ def menu_compte():
     return {"inline_keyboard": [
         [{"text": "👤 Mon Compte",         "callback_data": "/moncompte"}],
         [{"text": "🌐 Langue",             "callback_data": "/menu_langue"}],
+        [{"text": "🤝 Parrainer un ami",   "callback_data": "/parrainage"}],
+        [{"text": "👑 Voir les offres",    "callback_data": "/premium"}],
         [{"text": "🛎️ SAV",              "callback_data": "/sav"}],
         [{"text": "🔙 Retour",            "callback_data": "/menu_retour"}],
     ]}
@@ -603,7 +609,11 @@ def menu_paper(chat_id):
     ]}
 
 # ================== DONNÉES MARCHÉ ==================
+# Cache des news pour "En savoir plus"
+_news_cache = {}  # {index: {title, description, url}}
+
 def get_news():
+    global _news_cache
     articles = []
     url = "https://newsapi.org/v2/top-headlines"
     for params in [
@@ -616,8 +626,67 @@ def get_news():
                 articles.extend(r.json().get("articles", []))
         except:
             pass
-    return [f"- {a['title']} : {a.get('description','')[:150]}..."
-            for a in articles[:12] if a.get("title") and a.get("description")]
+    valid = [a for a in articles[:12] if a.get("title") and a.get("description")]
+    # Rafraichit le cache
+    _news_cache = {str(i): {"title": a["title"], "description": a.get("description",""), "url": a.get("url","")} for i, a in enumerate(valid)}
+    return [f"- {a['title']} : {a.get('description','')[:150]}..." for a in valid]
+
+def get_news_with_buttons():
+    """Retourne les news avec boutons En savoir plus pour chaque article"""
+    global _news_cache
+    articles = []
+    url_api = "https://newsapi.org/v2/top-headlines"
+    for params in [
+        {"apiKey": NEWSAPI_KEY, "pageSize": 8, "category": "business", "language": "en"},
+        {"apiKey": NEWSAPI_KEY, "pageSize": 6, "category": "general", "language": "fr", "country": "fr"},
+    ]:
+        try:
+            r = requests.get(url_api, params=params, timeout=10)
+            if r.status_code == 200:
+                articles.extend(r.json().get("articles", []))
+        except:
+            pass
+    valid = [a for a in articles[:10] if a.get("title") and a.get("description")]
+    _news_cache = {str(i): {"title": a["title"], "description": a.get("description",""), "url": a.get("url","")} for i, a in enumerate(valid)}
+    lines = []
+    keyboard = []
+    for i, a in enumerate(valid[:8]):
+        title = a["title"][:80]
+        desc  = a.get("description","")[:100]
+        lines.append(f"📰 *{title}*\n_{desc}_")
+        keyboard.append([{"text": f"🔍 En savoir plus — {title[:35]}...", "callback_data": f"/news_deep {i}"}])
+    return "\n\n".join(lines), keyboard
+
+def cmd_news_deep(chat_id, idx_str):
+    """Analyse approfondie d'une news avec Groq"""
+    news = _news_cache.get(str(idx_str)) or _news_cache.get(idx_str)
+    if not news:
+        send_message(chat_id, "Cette news n'est plus disponible. Recharge l'actu.")
+        return
+    lang = get_lang(chat_id)
+    instr = {"fr": "Analyse en français", "en": "Analysis in English", "es": "Análisis en español"}.get(lang, "Analyse en français")
+    send_message(chat_id, "🔍 _Analyse en cours..._")
+    prompt = f"""{instr}. Tu es un analyste financier senior. Analyse cette actualite pour un investisseur particulier.
+
+TITRE: {news['title']}
+DESCRIPTION: {news['description']}
+
+Fournis:
+1. RÉSUMÉ : Ce qui s'est passé en 2 phrases simples
+2. IMPACT MARCHÉ : Quels actifs (actions, crypto, matieres premieres) sont affectés et comment
+3. OPPORTUNITÉ : Y a-t-il un trade potentiel ? (BUY/SHORT/HOLD) — sois précis
+4. RISQUES : Quels sont les risques à surveiller
+5. HORIZON : Court terme (1-3j) / Moyen terme (1-4 semaines)
+
+Format téléphone, utilise des emojis, max 400 mots."""
+    try:
+        analyse = call_groq(prompt, max_tokens=600, temperature=0.3)
+        header = {"fr": "🔍 *ANALYSE APPROFONDIE*\n\n📰 _" + news['title'][:80] + "_\n\n", "en": "🔍 *DEEP ANALYSIS*\n\n📰 _" + news['title'][:80] + "_\n\n", "es": "🔍 *ANÁLISIS PROFUNDO*\n\n📰 _" + news['title'][:80] + "_\n\n"}.get(lang, "")
+        btns = [[{"text": "📈 Voir les signaux", "callback_data": "/menu_signaux"}], [{"text": "📊 RSI", "callback_data": "/menu_rsi"}], [{"text": "🔙 Retour actu", "callback_data": "/actu"}]]
+        send_message(chat_id, header + analyse, reply_markup={"inline_keyboard": btns})
+    except Exception as e:
+        print(f"Erreur news_deep: {e}")
+        send_message(chat_id, "Erreur lors de l'analyse. Réessaie.")
 
 def get_market_data():
     data = yf.download(TICKERS, period="2d", interval="1d", progress=False)["Close"]
@@ -709,6 +778,296 @@ MARKETS: {market_str}
 *CONCLUSION*: General trend + probability
 Max 3500 characters."""
     return call_groq(prompt, max_tokens=1100)
+
+
+# ================== LECONS HEBDOMADAIRES ==================
+LECONS = [
+    {
+        "titre": "RSI — Quand acheter, quand vendre",
+        "corps": (
+            "*Le RSI (Relative Strength Index)*\n\n"
+            "Le RSI mesure la force d'un mouvement de 0 a 100.\n\n"
+            "SURVENDU (RSI < 30)\n"
+            "Le marche a trop baisse, rebond potentiel.\n"
+            "Signal d'ACHAT pour les traders aguerris.\n\n"
+            "SURACHETE (RSI > 70)\n"
+            "Le marche a trop monte, correction possible.\n"
+            "Moment de PRUDENCE ou de VENTE partielle.\n\n"
+            "NEUTRE (30-70) : Pas de signal fort, attendre.\n\n"
+            "Astuce pro : Combine le RSI avec la tendance (SMA) pour de meilleurs resultats.\n\n"
+            "_Notre IA utilise le RSI 14j sur tous ses trades._"
+        )
+    },
+    {
+        "titre": "MACD — Lire les croisements",
+        "corps": (
+            "*Le MACD (Moving Average Convergence Divergence)*\n\n"
+            "Detecte les changements de tendance grace a 2 lignes :\n"
+            "- La ligne MACD (rapide)\n"
+            "- La ligne Signal (lente)\n\n"
+            "Croisement HAUSSIER : MACD passe AU-DESSUS du Signal\n"
+            "Tendance qui s'inverse a la hausse -> signal d'ACHAT\n\n"
+            "Croisement BAISSIER : MACD passe EN-DESSOUS du Signal\n"
+            "Tendance qui s'inverse a la baisse -> signal de VENTE\n\n"
+            "L'histogramme : difference entre les deux lignes.\n"
+            "Barres vertes croissantes = momentum haussier.\n"
+            "Barres rouges croissantes = momentum baissier.\n\n"
+            "_Notre IA surveille les croisements MACD 12/26/9 en temps reel._"
+        )
+    },
+    {
+        "titre": "Support & Resistance — Les niveaux cles",
+        "corps": (
+            "*Support & Resistance*\n\n"
+            "Ces niveaux sont les planchers et plafonds invisibles du marche.\n\n"
+            "Le Support : Zone ou le prix rebondit vers le haut.\n"
+            "Le marche refuse de descendre en-dessous.\n"
+            "Ideal pour ACHETER (risque limite).\n\n"
+            "La Resistance : Zone ou le prix bute vers le bas.\n"
+            "Le marche refuse de depasser ce niveau.\n"
+            "Ideal pour VENDRE ou eviter d'acheter.\n\n"
+            "La regle d'or :\n"
+            "Un ancien support casse devient une resistance.\n"
+            "Une ancienne resistance cassee devient un support.\n\n"
+            "_Notre IA calcule le support et la resistance sur 20 jours glissants._"
+        )
+    },
+    {
+        "titre": "Les SMA — Suivre la tendance",
+        "corps": (
+            "*Moyennes Mobiles (SMA)*\n\n"
+            "La SMA lisse le prix pour reveler la tendance profonde.\n\n"
+            "SMA 20 = Tendance court terme (1 mois)\n"
+            "SMA 50 = Tendance moyen terme (2 mois)\n"
+            "SMA 200 = Tendance long terme (annee)\n\n"
+            "Prix AU-DESSUS de la SMA20 -> Tendance haussiere -> favorise les achats.\n"
+            "Prix EN-DESSOUS de la SMA20 -> Tendance baissiere -> prudence.\n\n"
+            "La Croix d'Or : SMA20 passe au-dessus de SMA50 = signal haussier puissant.\n"
+            "La Croix de la Mort : SMA20 passe en-dessous de SMA50 = signal baissier fort.\n\n"
+            "_Notre IA utilise SMA20 et SMA50 pour valider chaque trade._"
+        )
+    },
+    {
+        "titre": "Gestion du risque — La regle des 1%",
+        "corps": (
+            "*Gestion du Risque*\n\n"
+            "La regle la plus importante : proteger son capital.\n\n"
+            "La regle des 1-2% :\n"
+            "Ne jamais risquer plus de 1-2% de son capital sur un seul trade.\n"
+            "Sur 10 000$ -> max 200$ de perte par trade.\n\n"
+            "Le Stop Loss : ordre automatique qui vend si le prix descend trop.\n"
+            "Notre IA utilise un stop loss automatique a -8%.\n\n"
+            "Le Take Profit : vend quand l'objectif est atteint.\n"
+            "Notre IA prend ses profits a +18%.\n\n"
+            "Le ratio Risk/Reward :\n"
+            "Vise toujours au moins 1:2 (risquer 1 pour gagner 2).\n"
+            "Avec un winrate de 50%, tu es rentable !\n\n"
+            "_Notre IA applique ces regles sur chaque trade automatiquement._"
+        )
+    },
+    {
+        "titre": "Les volumes — La verite du marche",
+        "corps": (
+            "*Les Volumes*\n\n"
+            "Le volume = le nombre de transactions. C'est le carburant des mouvements.\n\n"
+            "Principe cle : Un mouvement est fiable s'il est accompagne de volumes eleves.\n\n"
+            "Hausse + Volume fort -> Tendance haussiere solide.\n"
+            "Hausse + Volume faible -> Mefiance, mouvement peu credible.\n"
+            "Baisse + Volume fort -> Tendance baissiere solide.\n"
+            "Baisse + Volume faible -> Correction temporaire, possible rebond.\n\n"
+            "Le ratio de volume :\n"
+            "Comparer le volume actuel a la moyenne des 20 derniers jours.\n"
+            "Volume x2 = signal fort et fiable.\n"
+            "Volume < 0.5x = signal faible a ignorer.\n\n"
+            "_Notre IA calcule le ratio de volume sur 20j pour valider ses signaux._"
+        )
+    },
+]
+
+def get_this_week_lesson():
+    """Retourne la leçon de la semaine courante (rotation sur 6 semaines)"""
+    week_num = int(now_paris().strftime("%W"))
+    return LECONS[week_num % len(LECONS)]
+
+def load_lesson_sent():
+    if os.path.exists(LESSON_SENT_FILE):
+        try:
+            with open(LESSON_SENT_FILE) as f: return json.load(f)
+        except: pass
+    return {}
+
+def save_lesson_sent(data):
+    with open(LESSON_SENT_FILE, "w") as f: json.dump(data, f)
+
+
+# ================== PRICE TRACKING (alertes mouvements forts) ==================
+def load_price_tracking():
+    if os.path.exists(PRICE_TRACKING_FILE):
+        try:
+            with open(PRICE_TRACKING_FILE) as f: return json.load(f)
+        except: pass
+    return {}
+
+def save_price_tracking(data):
+    with open(PRICE_TRACKING_FILE, "w") as f: json.dump(data, f)
+
+MOVE_WATCH = {
+    "BTC-USD":  ("₿ Bitcoin",   "btc"),
+    "ETH-USD":  ("🔷 Ethereum", "eth"),
+    "NVDA":     ("🟢 Nvidia",   "nvda"),
+    "TSLA":     ("🚗 Tesla",    "tsla"),
+    "AAPL":     ("🍎 Apple",    "aapl"),
+    "META":     ("📘 Meta",     "meta"),
+    "AMZN":     ("📦 Amazon",   "amzn"),
+    "GC=F":     ("🥇 Or",       "gold"),
+}
+
+def check_strong_moves():
+    """Détecte les mouvements >5% sur les actifs clés et notifie TOUS les utilisateurs"""
+    tracking = load_price_tracking()
+    now_str = now_paris().strftime("%Y-%m-%d")
+    tickers = list(MOVE_WATCH.keys())
+    try:
+        data = yf.download(tickers, period="2d", interval="1d", progress=False)["Close"]
+        if data.empty: return
+        chg = data.pct_change().iloc[-1] * 100
+        current = data.iloc[-1]
+        users = load_users()
+        all_ids = set([int(TELEGRAM_CHAT_ID)] + [int(uid) for uid in users.keys()])
+        for ticker, (name, key) in MOVE_WATCH.items():
+            try:
+                pct = float(chg[ticker])
+                price = float(current[ticker])
+                if abs(pct) < 5.0: continue
+                alert_key = f"{ticker}_{now_str}_{int(abs(pct)//5)}"
+                if tracking.get(alert_key): continue
+                tracking[alert_key] = True
+                direction = "monté" if pct > 0 else "chuté"
+                icon = "🚀" if pct > 0 else "📉"
+                signal_dir = "BUY" if pct > 0 else "SHORT"
+                # Message pour TOUS
+                msg_free = (
+                    f"{icon} *{name}* vient de {direction} de *{abs(pct):.1f}%* aujourd'hui !\n\n"
+                    f"💰 Prix actuel : *{price:,.2f}$*\n\n"
+                    f"🔒 Nos membres Premium ont reçu le signal *{signal_dir}* "
+                    f"bien avant ce mouvement.\n\n"
+                    f"⚡ *Rejoins Premium pour ne plus rater ces opportunités.*"
+                )
+                msg_premium = (
+                    f"{icon} *MOUVEMENT FORT — {name}*\n\n"
+                    f"Variation : *{pct:+.1f}%* — Prix : *{price:,.2f}$*\n\n"
+                    f"📊 Consulte le signal *{signal_dir}* dans le menu Signaux pour l'analyse complète."
+                )
+                for uid in all_ids:
+                    try:
+                        if is_premium(uid):
+                            send_message(uid, msg_premium, reply_markup={"inline_keyboard":[
+                                [{"text": f"📈 Voir signal {name}", "callback_data": f"/signal {key}"}],
+                                [{"text": "🔙 Menu", "callback_data": "/menu_retour"}]
+                            ]})
+                        else:
+                            send_message(uid, msg_free, reply_markup={"inline_keyboard":[
+                                [{"text": f"👑 Rejoindre Premium — {PRIX_MENSUEL}/mois", "url": PAYMENT_LINK}],
+                                [{"text": "🔙 Menu", "callback_data": "/menu_retour"}]
+                            ]})
+                    except: pass
+                print(f"MOUVEMENT FORT: {name} {pct:+.1f}%")
+            except: continue
+        save_price_tracking(tracking)
+    except Exception as e:
+        print(f"Erreur check_strong_moves: {e}")
+
+
+# ================== PARRAINAGE ==================
+import hashlib
+
+def generate_referral_code(chat_id):
+    """Génère un code de parrainage unique et stable"""
+    return "REF" + hashlib.md5(str(chat_id).encode()).hexdigest()[:6].upper()
+
+def cmd_parrainage(chat_id, user_name):
+    code = generate_referral_code(chat_id)
+    user = get_user(chat_id)
+    filleuls = user.get("referrals", [])
+    bonus_days = user.get("referral_bonus_days", 0)
+    bot_username = "MonResumeMarche_bot"
+    link = f"https://t.me/{bot_username}?start={code}"
+    msg = (
+        f"*TON PROGRAMME DE PARRAINAGE*\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"Invite tes amis et gagnez *7 jours Premium GRATUITS* chacun !\n\n"
+        f"🔗 *Ton lien unique :*\n`{link}`\n\n"
+        f"📋 *Ton code :* `{code}`\n\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"👥 Amis parraines : *{len(filleuls)}*\n"
+        f"🎁 Jours bonus gagnes : *{bonus_days} jours*\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"*Comment ca marche ?*\n"
+        f"1. Partage ton lien ou code\n"
+        f"2. Ton ami rejoint et passe Premium\n"
+        f"3. Vous gagnez tous les 2 *7 jours gratuits* !\n\n"
+        f"_Les jours s\'ajoutent automatiquement a ton abonnement._"
+    )
+    send_message(chat_id, msg, reply_markup={"inline_keyboard": [
+        [{"text": "🔙 Retour", "callback_data": "/menu_retour"}]
+    ]})
+
+
+def apply_referral(new_chat_id, ref_code, new_name):
+    """Applique le parrainage quand un nouveau user arrive avec un code"""
+    users = load_users()
+    # Trouver le parrain
+    parrain_id = None
+    for uid, u in users.items():
+        if generate_referral_code(int(uid)) == ref_code.upper():
+            parrain_id = uid
+            break
+    if not parrain_id or parrain_id == str(new_chat_id):
+        return False
+    # Enregistrer le filleul chez le parrain
+    if "referrals" not in users[parrain_id]:
+        users[parrain_id]["referrals"] = []
+    if str(new_chat_id) not in users[parrain_id]["referrals"]:
+        users[parrain_id]["referrals"].append(str(new_chat_id))
+        users[parrain_id]["referral_bonus_days"] = users[parrain_id].get("referral_bonus_days", 0) + 7
+    # Enregistrer le parrain chez le filleul (pour bonus futur)
+    if str(new_chat_id) not in users:
+        users[str(new_chat_id)] = {"plan": "free", "expiry": None, "name": new_name, "lang": "fr"}
+    users[str(new_chat_id)]["referred_by"] = parrain_id
+    users[str(new_chat_id)]["pending_bonus"] = 7  # 7 jours offerts à l\'activation premium
+    save_users(users)
+    # Notifier le parrain
+    send_message(int(parrain_id),
+        "\U0001f389 *Nouveau filleul !*\n\n"
+        f"*{new_name}* vient de rejoindre via ton lien.\n"
+        "Des qu'il active son Premium, vous gagnez tous les deux *7 jours gratuits* !"
+    )
+    return True
+
+def apply_referral_bonus_on_premium(chat_id):
+    """Appele quand admin active le premium d'un utilisateur"""
+    user = get_user(chat_id)
+    if user.get("pending_bonus", 0) > 0:
+        bonus = user.get("pending_bonus", 0)
+        set_user_field(chat_id, "pending_bonus", 0)
+        send_message(chat_id,
+            f"+{bonus} jours offerts grace au parrainage !\n"
+            "Bienvenue dans le cercle Premium."
+        )
+    parrain_id = user.get("referred_by")
+    if parrain_id:
+        parrain = get_user(int(parrain_id))
+        bonus_days = parrain.get("referral_bonus_days", 0)
+        if parrain.get("plan") == "premium" and bonus_days > 0:
+            exp = parrain.get("expiry")
+            if exp:
+                new_exp = (datetime.strptime(exp, "%Y-%m-%d") + timedelta(days=7)).strftime("%Y-%m-%d")
+                set_user_field(int(parrain_id), "expiry", new_exp)
+                set_user_field(int(parrain_id), "referral_bonus_days", max(0, bonus_days - 7))
+                send_message(int(parrain_id),
+                    "+7 jours offerts !\n\n"
+                    f"Ton abonnement prolonge jusqu'au {new_exp}."
+                )
 
 def generate_trade_signal(asset_name, ticker, news_list, lang="fr"):
     prices = get_asset_data(ticker)
@@ -1015,6 +1374,94 @@ def menu_retour_msg(chat_id):
         msg = tr(chat_id, "menu_return_free")
     send_message(chat_id, msg, reply_markup=main_menu(chat_id))
 
+
+def cmd_lecon(chat_id):
+    """Affiche la leçon de la semaine"""
+    lecon = get_this_week_lesson()
+    send_message(chat_id, lecon["corps"], reply_markup={"inline_keyboard": [
+        [{"text": "📚 Prochaine leçon", "callback_data": "/lecon_next"}],
+        [{"text": "🔙 Retour", "callback_data": "/menu_retour"}]
+    ]})
+
+def cmd_lecon_next(chat_id):
+    """Leçon aléatoire différente de la semaine"""
+    week_num = int(now_paris().strftime("%W"))
+    idx = (week_num + random.randint(1, len(LECONS)-1)) % len(LECONS)
+    lecon = LECONS[idx]
+    send_message(chat_id, lecon["corps"], reply_markup={"inline_keyboard": [
+        [{"text": "📚 Autre leçon", "callback_data": "/lecon_next"}],
+        [{"text": "🔙 Retour", "callback_data": "/menu_retour"}]
+    ]})
+
+def cmd_premium_page(chat_id):
+    """Page Premium avec plan mensuel ET annuel"""
+    lang = get_lang(chat_id)
+    msgs = {
+        "fr": (
+            f"👑 *PASSER PREMIUM*\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"✅ Signaux BUY/SHORT — 14 actifs\n"
+            f"✅ RSI en temps réel — 9 actifs\n"
+            f"✅ Paper Trading sans risque\n"
+            f"✅ Alertes de prix personnalisées\n"
+            f"✅ Score marché quotidien\n"
+            f"✅ Pépite du jour + Citation exclusive\n"
+            f"✅ Briefing auto 8h + Bilan hebdo\n"
+            f"✅ Mode Apprentissage (1 leçon/semaine)\n"
+            f"✅ Wallet IA en temps réel\n\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"💳 *Plan mensuel :* {PRIX_MENSUEL}/mois\n"
+            f"💎 *Plan annuel :* {PRIX_ANNUEL}/an\n"
+            f"   ➜ _Économise 2 mois ! (≈ {PRIX_MENSUEL} x 10)_\n\n"
+            f"1️⃣ Choisis ton plan → 2️⃣ Paie → 3️⃣ Envoie la confirmation ici\n"
+            f"⚡ Accès quasi-instantané"
+        ),
+        "en": (
+            f"👑 *GO PREMIUM*\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"✅ BUY/SHORT Signals — 14 assets\n"
+            f"✅ Real-time RSI — 9 assets\n"
+            f"✅ Risk-free Paper Trading\n"
+            f"✅ Custom price alerts\n"
+            f"✅ Daily market score\n"
+            f"✅ Gem of the day + exclusive quote\n"
+            f"✅ Auto briefing 8h + weekly summary\n"
+            f"✅ Learning mode (1 lesson/week)\n"
+            f"✅ Live AI Wallet\n\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"💳 *Monthly:* {PRIX_MENSUEL}/month\n"
+            f"💎 *Annual:* {PRIX_ANNUEL}/year\n"
+            f"   ➜ _Save 2 months!_\n\n"
+            f"1️⃣ Choose plan → 2️⃣ Pay → 3️⃣ Send confirmation\n"
+            f"⚡ Near-instant access"
+        ),
+        "es": (
+            f"👑 *IR A PREMIUM*\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"✅ Señales BUY/SHORT — 14 activos\n"
+            f"✅ RSI en tiempo real — 9 activos\n"
+            f"✅ Paper Trading sin riesgo\n"
+            f"✅ Alertas de precio personalizadas\n"
+            f"✅ Puntuación diaria del mercado\n"
+            f"✅ Joya del día + cita exclusiva\n"
+            f"✅ Briefing auto 8h + resumen semanal\n"
+            f"✅ Modo Aprendizaje (1 lección/semana)\n"
+            f"✅ Wallet IA en vivo\n\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"💳 *Plan mensual:* {PRIX_MENSUEL}/mes\n"
+            f"💎 *Plan anual:* {PRIX_ANNUEL}/año\n"
+            f"   ➜ _¡Ahorra 2 meses!_\n\n"
+            f"1️⃣ Elige plan → 2️⃣ Paga → 3️⃣ Envía confirmación\n"
+            f"⚡ Acceso casi instantáneo"
+        ),
+    }
+    send_message(chat_id, msgs.get(lang, msgs["fr"]), reply_markup={"inline_keyboard": [
+        [{"text": f"💳 Mensuel — {PRIX_MENSUEL}/mois", "url": PAYMENT_LINK},
+         {"text": f"💎 Annuel — {PRIX_ANNUEL}/an", "url": PAYMENT_LINK_ANNUEL}],
+        [{"text": "🤝 Parrainer un ami", "callback_data": "/parrainage"}],
+        [{"text": "🔙 Retour", "callback_data": "/menu_retour"}]
+    ]})
+
 def cmd_moncompte(chat_id):
     user = get_user(chat_id)
     lang = get_lang(chat_id)
@@ -1060,23 +1507,74 @@ def cmd_moncompte(chat_id):
 def cmd_actu(chat_id):
     lang = get_lang(chat_id)
     send_message(chat_id, tr(chat_id, "processing"))
+    news_text, news_keyboard = get_news_with_buttons()
     news = get_news()
     market = get_market_data()
     summary = generate_summary(news, market, lang)
     titles = {"fr": "📊 *RÉSUMÉ MARCHÉ", "en": "📊 *MARKET SUMMARY", "es": "📊 *RESUMEN MERCADO"}
-    send_message(chat_id, f"{titles.get(lang,'📊 *RÉSUMÉ')} — {now_paris().strftime('%d/%m/%Y %H:%M')}*\n\n{summary}")
-    if not is_premium(chat_id):
-        upsell = {
-            "fr": "🔒 *Veux-tu aller plus loin ?*\n\nSignaux BUY/SHORT • RSI • Paper Trading • Alertes prix",
-            "en": "🔒 *Want to go further?*\n\nBUY/SHORT Signals • RSI • Paper Trading • Price Alerts",
-            "es": "🔒 *¿Quieres ir más lejos?*\n\nSeñales BUY/SHORT • RSI • Paper Trading • Alertas de precio",
+    if is_premium(chat_id):
+        send_message(chat_id, f"{titles.get(lang,'📊 *RÉSUMÉ')} — {now_paris().strftime('%d/%m/%Y %H:%M')}*\n\n{summary}")
+        deep_lbl = {"fr":"📰 *ACTUALITÉS*\n_Appuie sur une news pour l'analyse approfondie :_","en":"📰 *NEWS*\n_Tap a headline for in-depth analysis:_","es":"📰 *NOTICIAS*\n_Toca un titular para análisis profundo:_"}.get(lang,"📰 *ACTUALITÉS*")
+        news_keyboard.append([{"text": "🔙 Menu", "callback_data": "/menu_retour"}])
+        send_message(chat_id, deep_lbl, reply_markup={"inline_keyboard": news_keyboard})
+    else:
+        # Utilisateur gratuit : résumé + signal partiel FOMO + compteur
+        send_message(chat_id, f"{titles.get(lang,'📊 *RÉSUMÉ')} — {now_paris().strftime('%d/%m/%Y %H:%M')}*\n\n{summary}")
+        # Signal partiel — direction flouttée
+        teaser = _generate_signal_teaser(news)
+        if teaser:
+            send_message(chat_id, teaser)
+        # Compteur FOMO
+        h = now_paris().hour
+        signals_sent = 3 if 9 <= h < 14 else 2 if 14 <= h < 20 else 1
+        fomo = {
+            "fr": (
+                f"🔒 *{signals_sent} signaux envoyés aux membres Premium ce matin*\n\n"
+                f"Ils savent déjà sur quel actif trader — et dans quelle direction.\n\n"
+                f"*Plan mensuel :* {PRIX_MENSUEL}/mois\n"
+                f"*Plan annuel :* {PRIX_ANNUEL}/an _(2 mois offerts !)_\n\n"
+                f"⚡ Accès quasi-instantané après paiement."
+            ),
+            "en": (
+                f"🔒 *{signals_sent} signals sent to Premium members this morning*\n\n"
+                f"They already know which asset to trade — and in which direction.\n\n"
+                f"*Monthly:* {PRIX_MENSUEL}/month\n"
+                f"*Annual:* {PRIX_ANNUEL}/year _(2 months free!)_\n\n"
+                f"⚡ Near-instant access after payment."
+            ),
+            "es": (
+                f"🔒 *{signals_sent} señales enviadas a miembros Premium esta mañana*\n\n"
+                f"Ya saben en qué activo operar — y en qué dirección.\n\n"
+                f"*Plan mensual:* {PRIX_MENSUEL}/mes\n"
+                f"*Plan anual:* {PRIX_ANNUEL}/año _(2 meses gratis!)_\n\n"
+                f"⚡ Acceso casi instantáneo tras el pago."
+            ),
         }
-        send_message(chat_id, upsell.get(lang, upsell["fr"]), reply_markup={"inline_keyboard": [
-            [{"text": f"{tr(chat_id,'subscribe_btn')} {PRIX_MENSUEL}/mois", "url": PAYMENT_LINK}],
+        send_message(chat_id, fomo.get(lang, fomo["fr"]), reply_markup={"inline_keyboard": [
+            [{"text": f"💳 {PRIX_MENSUEL}/mois", "url": PAYMENT_LINK},
+             {"text": f"💎 {PRIX_ANNUEL}/an", "url": PAYMENT_LINK_ANNUEL}],
             [{"text": tr(chat_id,"btn_menu"), "callback_data": "/menu_retour"}]
         ]})
-    else:
-        menu_retour_msg(chat_id)
+
+def _generate_signal_teaser(news_list):
+    """Génère un signal partiel (direction + actif) sans la raison, pour créer du FOMO"""
+    assets_teaser = [
+        ("₿ Bitcoin",  "BUY 🟢"),  ("🟢 Nvidia",  "BUY 🟢"),
+        ("📘 Meta",    "SHORT 🔴"), ("🚗 Tesla",   "BUY 🟢"),
+        ("🔷 Ethereum","BUY 🟢"),  ("🍎 Apple",   "SHORT 🔴"),
+    ]
+    pick = random.choice(assets_teaser)
+    asset_name, direction = pick
+    blurred = "▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓"
+    return (
+        f"📡 *APERÇU SIGNAL PREMIUM*\n\n"
+        f"Actif : *{asset_name}*\n"
+        f"Direction : *{direction}*\n"
+        f"Raison : _{blurred}_\n"
+        f"Prix cible : _{blurred}_\n"
+        f"Stop loss : _{blurred}_\n\n"
+        f"🔒 _Débloque l\'analyse complète avec Premium._"
+    )
 
 def cmd_signal(chat_id, asset_key):
     if not is_premium(chat_id): return premium_lock(chat_id)
@@ -1407,6 +1905,7 @@ def cmd_admin(chat_id, text):
     cmd = parts[0]
     if cmd == "/addpremium" and len(parts) >= 4:
         expiry = add_premium(parts[1], parts[2], int(parts[3]))
+        apply_referral_bonus_on_premium(int(parts[1]))
         send_message(chat_id, f"✅ Premium activé : {parts[2]} ({parts[1]}) jusqu'au {expiry}")
         cmd_welcome_premium(int(parts[1]), parts[2])
     elif cmd == "/removepremium" and len(parts) >= 2:
@@ -1668,7 +2167,6 @@ News negatives (regulation, fraude, resultats decevants) = SHORT ou SELL urgence
   ],
   "analyse": "Synthese du contexte en 2 phrases"
 }}"""
-
     try:
         raw = call_groq(prompt, max_tokens=800, temperature=0.35)
         raw = raw.strip()
@@ -1821,8 +2319,7 @@ def ai_breaking_news_check():
         pnl_pct = ((pos["buy_price"] - price) if is_short else (price - pos["buy_price"])) / pos["buy_price"] * 100
         portfolio_str += f"- {pos['name']} ({pos.get('type','LONG')}) P&L={pnl_pct:+.1f}%\n"
 
-    prompt = f"""Tu es ARIA, une IA de trading. Analyse ces actualites et dis si l'une d'elles justifie un trade immediat.
-
+    prompt = f"""Tu es ARIA, une IA de trading. Analyse ces actualites et dis si l'une d'elles justifie un trade immediat.\n"
 ACTUALITES:
 {news_str}
 
@@ -1840,8 +2337,7 @@ Une "grosse news" justifiant un trade immediat est:
 - Adoption massive par une grande institution
 
 Reponds UNIQUEMENT en JSON:
-{{"breaking": true/false, "urgency": "high/medium/low", "summary": "Resume de la news en 1 phrase", "asset_key": "btc" ou null, "action": "BUY"/"SELL"/"SHORT" ou null, "reason": "Raison courte"}}"""
-
+{{"breaking": true/false, "urgency": "high/medium/low", "summary": "Resume", "asset_key": null, "action": null, "reason": "Raison"}}"""
     try:
         raw = call_groq(prompt, max_tokens=200, temperature=0.2)
         raw = raw.strip()
@@ -2072,11 +2568,47 @@ def check_auto_send():
             print(f"Erreur breaking news: {e}")
 
 
+    # Alertes prix (toutes les 5 min)
     if now.second < 3 and now.minute % 5 == 0:
         try:
             check_alerts()
         except Exception as e:
             print(f"Erreur alertes: {e}")
+
+    # Mouvements forts >5% (toutes les 30 min)
+    if now.second < 5 and now.minute % 30 == 0:
+        move_flag = f"moves_{today}_{now.hour}_{now.minute}"
+        if not globals().get(move_flag):
+            globals()[move_flag] = True
+            try:
+                threading.Thread(target=check_strong_moves, daemon=True).start()
+            except Exception as e:
+                print(f"Erreur mouvements forts: {e}")
+
+    # Leçon hebdomadaire le lundi à 10h
+    if now.weekday() == 0 and now.hour == 10 and now.minute == 0:
+        lesson_flag = f"lesson_{week}"
+        if not globals().get(lesson_flag):
+            globals()[lesson_flag] = True
+            try:
+                sent_data = load_lesson_sent()
+                if not sent_data.get(week):
+                    lecon = get_this_week_lesson()
+                    users = load_users()
+                    targets = [TELEGRAM_CHAT_ID] + [uid for uid, u in users.items() if u.get("plan") == "premium"]
+                    header = {"fr": "📚 *LEÇON DE LA SEMAINE*", "en": "📚 *LESSON OF THE WEEK*", "es": "📚 *LECCIÓN DE LA SEMANA*"}
+                    for target in set(targets):
+                        tid = int(target)
+                        lang = users.get(str(target), {}).get("lang", "fr")
+                        send_message(tid,
+                            f"{header.get(lang, header['fr'])}\n\n{lecon['corps']}",
+                            reply_markup={"inline_keyboard": [[{"text": "📚 Voir plus de leçons", "callback_data": "/lecon_next"}]]}
+                        )
+                    sent_data[week] = True
+                    save_lesson_sent(sent_data)
+                    print(f"Leçon envoyée: {lecon['titre']}")
+            except Exception as e:
+                print(f"Erreur lecon: {e}")
 
 # ================== ROUTING ==================
 def handle_command(chat_id, text, user_name=""):
@@ -2087,9 +2619,18 @@ def handle_command(chat_id, text, user_name=""):
         cmd_admin(chat_id, text); return
 
     # Commandes principales
-    if t_low == "/start":                    cmd_start(chat_id, user_name)
+    if t_low == "/start" or t_low.startswith("/start "):
+        # Vérifie si code de parrainage dans le start
+        parts = text.strip().split()
+        ref_code = parts[1] if len(parts) > 1 else None
+        if ref_code and ref_code.startswith("REF"):
+            apply_referral(chat_id, ref_code, user_name)
+        cmd_start(chat_id, user_name)
     elif t_low in ["/help","/accueil"]:      cmd_accueil(chat_id, user_name)
     elif t_low == "/actu":                   cmd_actu(chat_id)
+    elif t_low.startswith("/news_deep"):
+        idx = t_low.replace("/news_deep", "").strip()
+        cmd_news_deep(chat_id, idx)
     elif t_low == "/top":                    cmd_top(chat_id)
     elif t_low == "/chance":                 cmd_chance(chat_id)
     elif t_low == "/quote":                  cmd_quote(chat_id)
@@ -2098,19 +2639,14 @@ def handle_command(chat_id, text, user_name=""):
     elif t_low == "/performance":            cmd_performance(chat_id)
     elif t_low == "/avis":                   cmd_avis(chat_id, user_name)
     elif t_low == "/moncompte":              cmd_moncompte(chat_id)
-    elif t_low == "/premium":
-        send_message(chat_id,
-            f"👑 *PASSER PREMIUM — {PRIX_MENSUEL}/mois*\n\nTout ce qui est inclus :\n"
-            f"✅ Signaux BUY/SHORT • ✅ RSI • ✅ Paper Trading\n"
-            f"✅ Alertes prix • ✅ Pépite du jour • ✅ Score marché\n"
-            f"✅ Briefing 8h + Bilan dimanche • ✅ Analyses illimitées\n\n"
-            f"1️⃣ Clique ci-dessous → 2️⃣ Paie via PayPal → 3️⃣ Envoie la confirmation ici\n"
-            f"⚡ Accès activé quasi-instantanément",
-            reply_markup={"inline_keyboard": [
-                [{"text": f"💳 S'abonner — {PRIX_MENSUEL}/mois", "url": PAYMENT_LINK}],
-                [{"text": "🔙 Retour", "callback_data": "/menu_retour"}]
-            ]}
-        )
+    elif t_low in ["/premium", "/upgrade"]:
+        cmd_premium_page(chat_id)
+    elif t_low == "/parrainage":
+        cmd_parrainage(chat_id, user_name)
+    elif t_low == "/lecon":
+        cmd_lecon(chat_id)
+    elif t_low == "/lecon_next":
+        cmd_lecon_next(chat_id)
     # Menus
     elif t_low == "/menu_signaux":           send_message(chat_id, "📈 *Choisis un actif :*", reply_markup=menu_signaux())
     elif t_low == "/menu_rsi":               send_message(chat_id, "📊 *Choisis un actif :*", reply_markup=menu_rsi())
@@ -2242,3 +2778,4 @@ while True:
     except Exception as e:
         print(f"Erreur boucle: {e}")
         time.sleep(5)
+    
