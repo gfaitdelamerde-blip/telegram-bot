@@ -1271,7 +1271,7 @@ NEWS THIS WEEK: {chr(10).join(news_list)}
 Max 3500 chars."""
     return call_groq(prompt, max_tokens=1100, model="llama-3.1-8b-instant")
 
-def generate_hidden_gem(news_list):
+def generate_hidden_gem(news_list, lang="fr"):
     today = now_paris().strftime('%d/%m/%Y')
     candidates = {
         "RENDER-USD":"Render (RNDR)","INJ-USD":"Injective (INJ)",
@@ -1297,6 +1297,8 @@ def generate_hidden_gem(news_list):
             except: continue
     except:
         return "Données indisponibles."
+    if not info:
+        return "Données de marché indisponibles pour les pépites aujourd'hui."
     prompt = f"""Specialist in undervalued assets. Today: {today}
 ASSETS: {chr(10).join(info)}
 NEWS: {chr(10).join(news_list[:8])}
