@@ -49,6 +49,10 @@ AI_TRADABLE = {
     "gold": ("GC=F",    "Gold"),
 }
 
+# ─── URL DU DASHBOARD (100% automatique Railway) ───
+RAILWAY_DOMAIN = os.getenv("RAILWAY_PUBLIC_DOMAIN")
+DASHBOARD_BASE_URL = f"https://{RAILWAY_DOMAIN}" if RAILWAY_DOMAIN else "http://localhost:8080"
+
 TICKERS = ["BTC-USD","ETH-USD","GC=F","^GSPC","^DJI","^IXIC","AAPL","MSFT","NVDA","TSLA","AMZN"]
 
 SIGNAL_ASSETS = {
@@ -2915,6 +2919,7 @@ def cmd_mon_wallet(chat_id):
     e = "🟢" if pnl >= 0 else "🔴"
     copy_status = "✅ Activé" if uw.get("copy_trading") else "⏸️ Désactivé"
     win_rate = (uw["winning_trades"] / uw["total_trades"] * 100) if uw.get("total_trades",0) > 0 else 0
+
     lines = [
         "💼 *MON WALLET VIRTUEL*",
         "━━━━━━━━━━━━━━━━━━━━",
@@ -2925,6 +2930,7 @@ def cmd_mon_wallet(chat_id):
         f"🤖 Copy ARIA : *{copy_status}*",
         "",
     ]
+
     portfolio = uw.get("portfolio", {})
     if portfolio:
         lines.append("*Positions ouvertes :*")
@@ -2937,14 +2943,21 @@ def cmd_mon_wallet(chat_id):
             lines.append(f"  {ep} *{pos['name']}*{tag} @ {pos['buy_price']:,.2f}$ → {pp:+.1f}%")
     else:
         lines.append("_Aucune position ouverte._")
+
     lines += ["", f"🔑 *Token dashboard :* `{uw['token']}`"]
-    send_message(chat_id, "\n".join(lines), reply_markup={"inline_keyboard": [
-        [{"text": "🤖 Copy ARIA ON/OFF", "callback_data": "/copytrade_toggle"}],
-        [{"text": "📈 Acheter", "callback_data": "/uw_buy"},
-         {"text": "📉 Vendre",  "callback_data": "/uw_sell"}],
-        [{"text": "📜 Historique", "callback_data": "/uw_history"}],
-        [{"text": "🔙 Menu", "callback_data": "/menu_retour"}],
-    ]})
+
+    # ================== BOUTON MAGIQUE ==================
+    dashboard_url = f"{DASHBOARD_BASE_URL}/?token={uw['token']}"
+    send_message(chat_id, "\n".join(lines), reply_markup={
+        "inline_keyboard": [
+            [{"text": "🌐 OUVRIR MON DASHBOARD WALLET", "url": dashboard_url}],  # ← LE BOUTON !
+            [{"text": "🤖 Copy ARIA ON/OFF", "callback_data": "/copytrade_toggle"}],
+            [{"text": "📈 Acheter", "callback_data": "/uw_buy"},
+             {"text": "📉 Vendre",  "callback_data": "/uw_sell"}],
+            [{"text": "📜 Historique", "callback_data": "/uw_history"}],
+            [{"text": "🔙 Menu", "callback_data": "/menu_retour"}],
+        ]
+    })
 
 def cmd_copytrade_toggle(chat_id):
     if not is_premium(chat_id): return premium_lock(chat_id)
