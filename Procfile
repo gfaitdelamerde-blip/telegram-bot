@@ -1,1 +1,1 @@
-worker: python bot_listener.py
+web: python bot_listener.py
