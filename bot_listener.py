@@ -2104,6 +2104,7 @@ def cmd_admin(chat_id, text):
 
 # ================== AI WALLET PUBLIC ==================
 AI_WALLET_FILE   = "ai_wallet.json"
+ARIA_DASHBOARD_TOKEN = "ARIA00000000"   # Token fixe pour accéder au wallet IA depuis le dashboard
 USER_WALLETS_FILE = "user_wallets.json"
 UW_INITIAL        = 10000.0
 AI_WALLET_INITIAL = 10000.0
@@ -3163,6 +3164,33 @@ def _start_api_server():
 
             if not token:
                 return jsonify({"error": "token required"}), 400
+
+            # Token spécial ARIA → lit le wallet IA directement
+            if token == ARIA_DASHBOARD_TOKEN:
+                w = load_ai_wallet()
+                total = ai_wallet_total_value(w)
+                pnl, pnl_pct = ai_wallet_pnl(w)
+                positions = []
+                for key, pos in w.get("portfolio", {}).items():
+                    price = get_asset_price(pos.get("ticker")) or pos.get("buy_price", 0)
+                    is_short = pos.get("type") == "SHORT"
+                    pp = ((pos["buy_price"] - price) if is_short else (price - pos["buy_price"])) / pos["buy_price"] * 100 if pos["buy_price"] > 0 else 0
+                    positions.append({"name": pos.get("name", key), "type": pos.get("type","LONG"), "buy_price": round(pos.get("buy_price",0),2), "current_price": round(price,2), "pnl_pct": round(pp,2), "value": round(pos.get("qty",0)*price,2)})
+                win_rate = round(w.get("winning_trades",0) / max(w.get("total_trades",1),1) * 100, 1)
+                return jsonify({
+                    "name": "🤖 ARIA — Wallet IA",
+                    "balance": round(w.get("balance",0),2),
+                    "total_value": round(total,2),
+                    "pnl": round(pnl,2),
+                    "pnl_pct": round(pnl_pct,2),
+                    "copy_trading": False,
+                    "is_aria": True,
+                    "total_trades": w.get("total_trades",0),
+                    "win_rate": win_rate,
+                    "positions": positions,
+                    "history": w.get("history",[])[-50:][::-1],
+                    "perf_history": _build_perf_history(w),
+                })
 
             wallets = load_user_wallets()
             uw = next((w for w in wallets.values() if w.get("token","").upper() == token), None)
