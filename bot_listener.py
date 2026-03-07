@@ -3224,10 +3224,8 @@ def _start_api_server():
     @app.route("/health")
     def health(): return "ok"
 
-    # Railway impose son propre PORT — Flask DOIT écouter dessus.
-    # Sans ça Railway considère le service comme "down" et bloque le trafic.
     port = int(os.environ.get("PORT", 8080))
-    print(f"🌐 API Flask démarrée sur le port {port}")
+    print(f"🌐 API démarrée sur le port {port}")
     app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
 
 def _build_perf_history(w):
@@ -3267,22 +3265,7 @@ def handle_command(chat_id, text, user_name=""):
     elif t_low == "/chance":                 cmd_chance(chat_id)
     elif t_low == "/quote":                  cmd_quote(chat_id)
     elif t_low == "/aiwallet":                cmd_ai_wallet(chat_id)
-    elif t_low in ["/mon_wallet", "/mywallet"]:
-        threading.Thread(target=cmd_mon_wallet, args=(chat_id,), daemon=True).start()
-    elif t_low == "/copytrade_toggle":
-        cmd_copytrade_toggle(chat_id)
-    elif t_low == "/uw_history":
-        cmd_uw_history(chat_id)
-    elif t_low == "/uw_buy":
-        cmd_uw_buy_menu(chat_id)
-    elif t_low == "/uw_sell":
-        cmd_uw_sell_menu(chat_id)
-    elif t_low.startswith("/uw_buy_asset"):
-        ak = t_low.replace("/uw_buy_asset", "").strip()
-        cmd_uw_buy_asset(chat_id, ak)
-    elif t_low.startswith("/uw_sell_asset"):
-        pk = t_low.replace("/uw_sell_asset", "").strip()
-        threading.Thread(target=cmd_uw_sell_asset, args=(chat_id, pk), daemon=True).start()
+    elif t_low == "/mon_wallet":                cmd_mon_wallet(chat_id)
     elif t_low == "/score":                  cmd_score(chat_id)
     elif t_low == "/performance":            cmd_performance(chat_id)
     elif t_low == "/avis":                   cmd_avis(chat_id, user_name)
@@ -3405,35 +3388,42 @@ def get_updates(offset=None):
 print("🤖 Bot démarré !")
 print("Fonctionnalités : Signaux(14) • RSI(9) • Paper Trading • Alertes • Score • Hebdo • Langues(FR/EN/ES)")
 
-# Préchauffage du cache + démarrage API web
-threading.Thread(target=_start_api_server, daemon=True).start()
-# Préchauffage du cache au démarrage (en arrière-plan — bot réactif immédiatement)
+# Préchauffage du cache au démarrage (en arrière-plan)
 print("Préchauffage cache news+marché en arrière-plan...")
 threading.Thread(target=_do_refresh_cache, daemon=True).start()
 
-offset = None
-while True:
-    try:
-        updates = get_updates(offset)
-        for update in updates:
-            offset = update["update_id"] + 1
-            if "callback_query" in update:
-                cq = update["callback_query"]
-                answer_callback(cq["id"])
-                cid = cq["message"]["chat"]["id"]
-                uname = cq["message"]["chat"].get("first_name", "")
-                print(f"Bouton: {cq['data'][:30]} | {cid}")
-                handle_command(cid, cq["data"], uname)
-            elif "message" in update:
-                msg = update["message"]
-                txt = msg.get("text", "")
-                cid = msg["chat"]["id"]
-                uname = msg["chat"].get("first_name", "")
-                if txt:
-                    print(f"Message: {txt[:30]} | {cid}")
-                    handle_command(cid, txt, uname)
-        check_auto_send()
-        time.sleep(1)
-    except Exception as e:
-        print(f"Erreur boucle: {e}")
-        time.sleep(5)
+# Boucle Telegram dans un thread dédié (Flask prend le thread principal)
+def _bot_loop():
+    offset = None
+    while True:
+        try:
+            updates = get_updates(offset)
+            for update in updates:
+                offset = update["update_id"] + 1
+                if "callback_query" in update:
+                    cq = update["callback_query"]
+                    answer_callback(cq["id"])
+                    cid = cq["message"]["chat"]["id"]
+                    uname = cq["message"]["chat"].get("first_name", "")
+                    print(f"Bouton: {cq['data'][:30]} | {cid}")
+                    handle_command(cid, cq["data"], uname)
+                elif "message" in update:
+                    msg = update["message"]
+                    txt = msg.get("text", "")
+                    cid = msg["chat"]["id"]
+                    uname = msg["chat"].get("first_name", "")
+                    if txt:
+                        print(f"Message: {txt[:30]} | {cid}")
+                        handle_command(cid, txt, uname)
+            check_auto_send()
+            time.sleep(1)
+        except Exception as e:
+            print(f"Erreur boucle: {e}")
+            time.sleep(5)
+
+# Le bot tourne en thread — Flask dans le thread principal (requis par Railway)
+threading.Thread(target=_bot_loop, daemon=True).start()
+print("Boucle Telegram demarree en thread")
+
+# Flask demarre dans le thread principal — Railway voit le port immediatement
+_start_api_server()
