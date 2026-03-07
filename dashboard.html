@@ -281,7 +281,7 @@ function timeAgo(str){
 // ── ARIA DATA ──
 async function loadAria() {
   try {
-    const r = await fetch(`${API}/api/wallet?token=ARIA00000000`);
+    const r = await fetch(`${API}/api/wallet?token=${ARIA_TOKEN}`);
     const d = await r.json();
     if(d.error && !d.is_aria){showError('aria-cards',d.error);return;}
     renderAriaCards(d);
@@ -551,10 +551,12 @@ function showError(elId, msg) {
 }
 
 // ── AUTO REFRESH ──
+// Le wallet ARIA est toujours chargé automatiquement (token fixe)
+const ARIA_TOKEN = "ARIA00000000";
 loadAria();
-setInterval(loadAria, 30000); // refresh every 30s
+setInterval(loadAria, 30000);
 
-// Auto-load token from URL param
+// Auto-load token perso depuis URL param (?token=XXXX)
 const urlToken = new URLSearchParams(window.location.search).get('token');
 if(urlToken){
   document.getElementById('tokenInput').value = urlToken;
