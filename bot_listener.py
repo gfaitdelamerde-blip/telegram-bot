@@ -2770,6 +2770,7 @@ def check_auto_send():
 # USER WALLET SYSTEM — copy trading + trades manuels
 # ════════════════════════════════════════════════════════════════
 _uw_lock = threading.Lock()
+_ai_running = threading.Lock()   
 
 def _uw_token(chat_id):
     import hashlib
@@ -3156,32 +3157,58 @@ def _start_api_server():
 
     @app.route("/api/wallet")
     def api_wallet():
-        token = request.args.get("token","").upper()
-        if not token: return jsonify({"error":"token required"}), 400
-        wallets = load_user_wallets()
-        uw = next((w for w in wallets.values() if w.get("token","").upper()==token), None)
-        if not uw: return jsonify({"error":"wallet not found"}), 404
-        total = uw_total_value(uw)
-        pnl, pnl_pct = uw_pnl(uw)
-        positions = []
-        for key, pos in uw.get("portfolio",{}).items():
-            price = get_asset_price(pos["ticker"]) or pos["buy_price"]
-            is_s  = pos.get("type")=="SHORT"
-            pp    = ((pos["buy_price"]-price) if is_s else (price-pos["buy_price"])) / pos["buy_price"] * 100
-            positions.append({"key":key,"name":pos["name"],"type":pos.get("type","LONG"),"qty":pos["qty"],"buy_price":pos["buy_price"],"current_price":price,"pnl_pct":round(pp,2),"value":round(pos["qty"]*price,2),"date":pos.get("date","")})
-        return jsonify({
-            "name": uw.get("name",""),
-            "balance": round(uw["balance"],2),
-            "total_value": round(total,2),
-            "pnl": round(pnl,2),
-            "pnl_pct": round(pnl_pct,2),
-            "copy_trading": uw.get("copy_trading",False),
-            "total_trades": uw.get("total_trades",0),
-            "win_rate": round(uw.get("winning_trades",0)/uw.get("total_trades",1)*100,1) if uw.get("total_trades",0)>0 else 0,
-            "positions": positions,
-            "history": uw.get("history",[])[-30:][::-1],
-            "perf_history": uw.get("perf_history",[]),
-        })
+        try:
+            token = request.args.get("token", "").upper().strip()
+            print(f"[API WALLET] Token reçu: {token[:10]}...")
+
+            if not token:
+                return jsonify({"error": "token required"}), 400
+
+            wallets = load_user_wallets()
+            uw = next((w for w in wallets.values() if w.get("token","").upper() == token), None)
+
+            if not uw:
+                print(f"[API WALLET] Token non trouvé")
+                return jsonify({"error": "wallet not found"}), 404
+
+            total = uw_total_value(uw)
+            pnl, pnl_pct = uw_pnl(uw)
+
+            positions = []
+            for key, pos in uw.get("portfolio", {}).items():
+                price = get_asset_price(pos.get("ticker")) or pos.get("buy_price", 0)
+                is_short = pos.get("type") == "SHORT"
+                pnl_pos = ((pos["buy_price"] - price) if is_short else (price - pos["buy_price"])) / pos["buy_price"] * 100 if pos["buy_price"] > 0 else 0
+                positions.append({
+                    "name": pos.get("name", key),
+                    "type": pos.get("type", "LONG"),
+                    "buy_price": round(pos.get("buy_price",0),2),
+                    "current_price": round(price,2),
+                    "pnl_pct": round(pnl_pos,2),
+                    "value": round(pos.get("qty",0) * price, 2)
+                })
+
+            response = {
+                "name": uw.get("name", "Mon Wallet"),
+                "balance": round(uw.get("balance",0),2),
+                "total_value": round(total,2),
+                "pnl": round(pnl,2),
+                "pnl_pct": round(pnl_pct,2),
+                "copy_trading": uw.get("copy_trading", False),
+                "total_trades": uw.get("total_trades",0),
+                "win_rate": round(uw.get("winning_trades",0) / max(uw.get("total_trades",1),1) * 100, 1),
+                "positions": positions,
+                "history": uw.get("history", [])[-30:],
+                "perf_history": uw.get("perf_history", [])
+            }
+            print(f"[API WALLET] Succès - Valeur totale: {total}$")
+            return jsonify(response)
+
+        except Exception as e:
+            import traceback
+            print(f"[API WALLET CRASH] {str(e)}")
+            print(traceback.format_exc())
+            return jsonify({"error": "internal server error"}), 500
 
     @app.route("/api/leaderboard")
     def api_leaderboard():
