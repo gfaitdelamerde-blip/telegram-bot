@@ -3224,9 +3224,9 @@ def _start_api_server():
     @app.route("/health")
     def health(): return "ok"
 
-    # Sur Railway, PORT est utilisé par le reverse proxy.
-    # On bind Flask sur FLASK_PORT (défaut 5000) pour éviter les conflits.
-    port = int(os.environ.get("FLASK_PORT", os.environ.get("PORT", 5000)))
+    # Railway impose son propre PORT — Flask DOIT écouter dessus.
+    # Sans ça Railway considère le service comme "down" et bloque le trafic.
+    port = int(os.environ.get("PORT", 8080))
     print(f"🌐 API Flask démarrée sur le port {port}")
     app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
 
