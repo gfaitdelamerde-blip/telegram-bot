@@ -281,9 +281,9 @@ function timeAgo(str){
 // ── ARIA DATA ──
 async function loadAria() {
   try {
-    const r = await fetch(`${API}/api/aria`);
+    const r = await fetch(`${API}/api/wallet?token=ARIA00000000`);
     const d = await r.json();
-    if(d.error){showError('aria-cards',d.error);return;}
+    if(d.error && !d.is_aria){showError('aria-cards',d.error);return;}
     renderAriaCards(d);
     renderAriaChart(d.perf_history||[]);
     renderAriaDonut(d);
@@ -311,11 +311,11 @@ function renderAriaCards(d) {
     <div class="card blue">
       <div class="card-label">Win Rate</div>
       <div class="card-value neu">${d.win_rate.toFixed(0)}%</div>
-      <div class="card-sub">${d.winning_trades}/${d.total_trades} trades</div>
+      <div class="card-sub">${d.total_trades} trades au total</div>
     </div>
     <div class="card gold">
       <div class="card-label">Dernier trade</div>
-      <div class="card-value" style="font-size:16px;color:var(--gold)">${timeAgo(d.last_trade)||'—'}</div>
+      <div class="card-value" style="font-size:16px;color:var(--gold)">${timeAgo((d.history&&d.history[0])?d.history[0].date:'')||'—'}</div>
       <div class="card-sub">Cash : ${fmt$(d.balance)}</div>
     </div>`;
 }
