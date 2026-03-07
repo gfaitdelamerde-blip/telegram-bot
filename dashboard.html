@@ -244,10 +244,15 @@ input:checked+.toggle-slider::before{background:#000;transform:translateX(20px)}
 
 <script>
 // ── CONFIG ──
-// Change this URL to your Railway URL
-const API = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-  ? 'http://localhost:8080'
-  : window.location.origin;
+// 👇 METS TON URL RAILWAY ICI (ex: "https://mon-bot.railway.app")
+// Laisse "" pour utiliser automatiquement le même serveur que le site
+const RAILWAY_URL = "https://procfile-production-2c34.up.railway.app";
+
+const API = RAILWAY_URL
+  ? RAILWAY_URL.replace(/\/$/, '')
+  : (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+    ? 'http://localhost:5000'
+    : window.location.origin;
 
 let ariaChart = null, ariaDonut = null, uwChart = null;
 let currentToken = '';
