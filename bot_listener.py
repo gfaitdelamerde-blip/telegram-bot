@@ -2104,7 +2104,6 @@ def cmd_admin(chat_id, text):
 
 # ================== AI WALLET PUBLIC ==================
 AI_WALLET_FILE   = "ai_wallet.json"
-ARIA_DASHBOARD_TOKEN = "ARIA00000000"   # Token fixe pour accéder au wallet IA depuis le dashboard
 USER_WALLETS_FILE = "user_wallets.json"
 UW_INITIAL        = 10000.0
 AI_WALLET_INITIAL = 10000.0
@@ -3165,33 +3164,6 @@ def _start_api_server():
             if not token:
                 return jsonify({"error": "token required"}), 400
 
-            # Token spécial ARIA → lit le wallet IA directement
-            if token == ARIA_DASHBOARD_TOKEN:
-                w = load_ai_wallet()
-                total = ai_wallet_total_value(w)
-                pnl, pnl_pct = ai_wallet_pnl(w)
-                positions = []
-                for key, pos in w.get("portfolio", {}).items():
-                    price = get_asset_price(pos.get("ticker")) or pos.get("buy_price", 0)
-                    is_short = pos.get("type") == "SHORT"
-                    pp = ((pos["buy_price"] - price) if is_short else (price - pos["buy_price"])) / pos["buy_price"] * 100 if pos["buy_price"] > 0 else 0
-                    positions.append({"name": pos.get("name", key), "type": pos.get("type","LONG"), "buy_price": round(pos.get("buy_price",0),2), "current_price": round(price,2), "pnl_pct": round(pp,2), "value": round(pos.get("qty",0)*price,2)})
-                win_rate = round(w.get("winning_trades",0) / max(w.get("total_trades",1),1) * 100, 1)
-                return jsonify({
-                    "name": "🤖 ARIA — Wallet IA",
-                    "balance": round(w.get("balance",0),2),
-                    "total_value": round(total,2),
-                    "pnl": round(pnl,2),
-                    "pnl_pct": round(pnl_pct,2),
-                    "copy_trading": False,
-                    "is_aria": True,
-                    "total_trades": w.get("total_trades",0),
-                    "win_rate": win_rate,
-                    "positions": positions,
-                    "history": w.get("history",[])[-50:][::-1],
-                    "perf_history": _build_perf_history(w),
-                })
-
             wallets = load_user_wallets()
             uw = next((w for w in wallets.values() if w.get("token","").upper() == token), None)
 
@@ -3248,6 +3220,393 @@ def _start_api_server():
             board.append({"name": uw.get("name","User")[:12], "pnl_pct": round(pnl_pct,2), "total_value": round(total,2), "copy_trading": uw.get("copy_trading",False)})
         board.sort(key=lambda x: x["pnl_pct"], reverse=True)
         return jsonify(board[:20])
+
+    @app.route("/api/auth")
+    def api_auth():
+        try:
+            token = request.args.get("token", "").upper().strip()
+            users = load_users()
+            for uid, u in users.items():
+                if u.get("token", "").upper() == token:
+                    return jsonify({
+                        "valid": True,
+                        "token": token,
+                        "name": u.get("name", "User"),
+                        "plan": u.get("plan", "free"),
+                        "expiry": u.get("expiry", None)
+                    })
+            if token == ARIA_DASHBOARD_TOKEN:
+                return jsonify({"valid": True, "token": token, "name": "Visiteur", "plan": "free", "expiry": None})
+            return jsonify({"valid": False}), 404
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/news")
+    def api_news():
+        try:
+            news_list = []
+            with _cache_lock:
+                cache = dict(_news_cache)
+
+            if not cache:
+                get_news()
+                import time; time.sleep(2)
+                with _cache_lock:
+                    cache = dict(_news_cache)
+
+            for i, art in cache.items():
+                news_list.append({
+                    "id": int(i),
+                    "title": art.get("title", ""),
+                    "description": art.get("description", ""),
+                    "url": art.get("url", ""),
+                    "source": art.get("source", "NewsAPI"),
+                    "time": art.get("publishedAt", "")[:10] if art.get("publishedAt") else ""
+                })
+
+            return jsonify(news_list[:10])
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/news/analysis")
+    def api_news_analysis():
+        try:
+            token = request.args.get("token", "").upper().strip()
+            idx = request.args.get("idx", "0")
+
+            users = load_users()
+            is_user_premium = any(u.get("token","").upper() == token and u.get("plan") == "premium"
+                                  for u in users.values())
+            if not is_user_premium:
+                return jsonify({"error": "premium required"}), 403
+
+            with _cache_lock:
+                art = _news_cache.get(str(idx))
+            if not art:
+                return jsonify({"error": "news not found"}), 404
+
+            FAST_MODEL = "llama-3.1-8b-instant"
+            prompt = f"""Analyse cette actualité financière en 5 points JSON.
+Titre: {art.get('title', '')}
+Description: {art.get('description', '')}
+
+Réponds UNIQUEMENT en JSON:
+{{"summary": "résumé en 2 phrases", "impact": "impact sur les marchés", "opportunity": "opportunité de trade potentielle", "risks": "risques principaux", "horizon": "court/moyen/long terme"}}"""
+
+            raw = call_groq(prompt, max_tokens=400, temperature=0.3, model=FAST_MODEL)
+            start = raw.find("{")
+            end = raw.rfind("}") + 1
+            result = json.loads(raw[start:end])
+            return jsonify(result)
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/signal")
+    def api_signal():
+        try:
+            token = request.args.get("token", "").upper().strip()
+            asset_key = request.args.get("asset", "btc").lower()
+
+            asset_info = AI_TRADABLE.get(asset_key)
+            if not asset_info:
+                return jsonify({"error": "asset not found"}), 404
+            ticker, asset_name = asset_info
+
+            users = load_users()
+            is_user_premium = any(u.get("token","").upper() == token and u.get("plan") == "premium"
+                                  for u in users.values())
+
+            news = get_news()
+            price = get_asset_price(ticker) or 0
+
+            SIGNAL_MODEL = "llama-3.3-70b-versatile"
+            news_str = "\n".join(news[:5])
+            prompt = f"""Tu es un analyste trading expert. Génère un signal pour {asset_name} (prix actuel: {price:.2f}$).
+Actualités: {news_str}
+Réponds UNIQUEMENT en JSON:
+{{"direction": "BUY ou SHORT", "conviction": 75, "target": {price*1.05:.2f}, "stop": {price*0.95:.2f}, "reason": "raison fondamentale", "tech": "analyse technique", "risk": "Low/Medium/High"}}"""
+
+            raw = call_groq(prompt, max_tokens=300, temperature=0.3, model=SIGNAL_MODEL)
+            start = raw.find("{")
+            end = raw.rfind("}") + 1
+            signal = json.loads(raw[start:end])
+            signal["asset"] = asset_key.upper()
+            signal["price"] = price
+
+            if not is_user_premium:
+                signal["target"] = "▓▓▓▓▓"
+                signal["stop"] = "▓▓▓▓▓"
+                signal["reason"] = "▓▓▓▓▓▓▓▓▓▓▓▓"
+                signal["tech"] = "▓▓▓▓▓▓▓▓▓▓▓▓"
+
+            return jsonify(signal)
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/signals")
+    def api_signals():
+        try:
+            token = request.args.get("token", "").upper().strip()
+            users = load_users()
+            is_user_premium = any(u.get("token","").upper() == token and u.get("plan") == "premium"
+                                  for u in users.values())
+
+            assets_to_scan = ["btc", "eth", "nvda", "tsla", "aapl", "meta"]
+            news = get_news()
+            news_str = "\n".join(news[:6])
+            signals = []
+
+            for asset_key in assets_to_scan:
+                asset_info = AI_TRADABLE.get(asset_key)
+                if not asset_info: continue
+                ticker, asset_name = asset_info
+                price = get_asset_price(ticker) or 0
+
+                prompt = f"""Signal rapide pour {asset_name} (prix: {price:.2f}$). Actualités: {news_str[:500]}
+JSON uniquement: {{"direction":"BUY ou SHORT","conviction":75,"target":{price*1.05:.2f},"stop":{price*0.95:.2f},"reason":"raison courte","risk":"Low/Medium/High"}}"""
+
+                try:
+                    raw = call_groq(prompt, max_tokens=150, temperature=0.3, model="llama-3.1-8b-instant")
+                    start = raw.find("{")
+                    end = raw.rfind("}") + 1
+                    sig = json.loads(raw[start:end])
+                    sig["asset"] = asset_key.upper()
+                    sig["price"] = price
+                    if not is_user_premium:
+                        sig["target"] = "▓▓▓▓▓"
+                        sig["stop"] = "▓▓▓▓▓"
+                        sig["reason"] = "▓▓▓▓▓▓▓▓▓▓▓▓"
+                        sig["tech"] = ""
+                    signals.append(sig)
+                except:
+                    signals.append({"asset": asset_key.upper(), "direction": "HOLD", "conviction": 50, "price": price})
+
+            return jsonify(signals)
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/rsi")
+    def api_rsi():
+        try:
+            result = []
+            for key, (ticker, name) in RSI_ASSETS.items():
+                try:
+                    val = compute_rsi(ticker)
+                    price = get_asset_price(ticker) or 0
+                    if val is not None:
+                        if val >= 70:   label = "Suracheté"
+                        elif val <= 30: label = "Survendu"
+                        else:           label = "Neutre"
+                        result.append({
+                            "asset": key.upper(),
+                            "name": name.replace("₿ ","").replace("🔷 ","").replace("🟢 ",""),
+                            "value": round(val, 1),
+                            "price": round(price, 2),
+                            "label": label
+                        })
+                except:
+                    continue
+            return jsonify(result)
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/score")
+    def api_score():
+        try:
+            score, sentiment, conseil, bar = generate_market_score()
+            trend = sentiment.replace("*","").replace("🟢 ","").replace("🟡 ","").replace("🔴 ","")
+            return jsonify({
+                "score": score,
+                "trend": trend,
+                "sentiment": sentiment,
+                "conseil": conseil,
+                "factors": [conseil, f"Score composite : {score}/100", f"Barre : {bar}"]
+            })
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/gem")
+    def api_gem():
+        try:
+            token = request.args.get("token", "").upper().strip()
+            users = load_users()
+            is_user_premium = any(u.get("token","").upper() == token and u.get("plan") == "premium"
+                                  for u in users.values())
+            if not is_user_premium:
+                return jsonify({"error": "premium required"}), 403
+
+            news = get_news()
+            gem_text = generate_hidden_gem(news, lang="fr")
+            return jsonify({"content": gem_text, "date": now_paris().strftime("%d/%m/%Y")})
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/lessons")
+    def api_lessons():
+        try:
+            lesson = get_this_week_lesson()
+            content = lesson["corps"].replace("*", "").replace("_", "")
+            return jsonify({
+                "title": lesson["titre"],
+                "content": content,
+                "example": "Exemple : si le RSI de BTC passe sous 30, c'est souvent un point d'entrée intéressant.",
+                "week": now_paris().strftime("%W")
+            })
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/alerts")
+    def api_alerts_get():
+        try:
+            token = request.args.get("token", "").upper().strip()
+            users = load_users()
+            user_entry = next(((uid, u) for uid, u in users.items() if u.get("token","").upper() == token), None)
+            if not user_entry:
+                return jsonify([])
+            uid, u = user_entry
+            return jsonify(u.get("alertes", []))
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/alerts/add", methods=["POST"])
+    def api_alerts_add():
+        try:
+            data = request.get_json() or {}
+            token = data.get("token", "").upper().strip()
+            users = load_users()
+            uid = next((k for k, u in users.items() if u.get("token","").upper() == token), None)
+            if not uid:
+                return jsonify({"error": "user not found"}), 404
+            if len(users[uid].get("alertes", [])) >= 5:
+                return jsonify({"error": "max 5 alertes"}), 400
+            alerte = {
+                "asset": data.get("asset", "").upper(),
+                "ticker": data.get("ticker", "BTC-USD"),
+                "price": float(data.get("price", 0)),
+                "cond": data.get("direction", "above")
+            }
+            users[uid].setdefault("alertes", []).append(alerte)
+            save_users(users)
+            return jsonify({"ok": True})
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/alerts/del", methods=["DELETE", "POST"])
+    def api_alerts_del():
+        try:
+            data = request.get_json() or {}
+            token = data.get("token", "").upper().strip()
+            idx = int(data.get("idx", 0))
+            users = load_users()
+            uid = next((k for k, u in users.items() if u.get("token","").upper() == token), None)
+            if not uid:
+                return jsonify({"error": "user not found"}), 404
+            alertes = users[uid].get("alertes", [])
+            if 0 <= idx < len(alertes):
+                alertes.pop(idx)
+                users[uid]["alertes"] = alertes
+                save_users(users)
+            return jsonify({"ok": True})
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/trade/buy", methods=["POST"])
+    def api_trade_buy():
+        try:
+            data = request.get_json() or {}
+            token = data.get("token", "").upper().strip()
+            asset_key = data.get("asset", "").lower()
+            amount = float(data.get("amount", 0))
+
+            wallets = load_user_wallets()
+            uw = next((w for w in wallets.values() if w.get("token","").upper() == token), None)
+            if not uw:
+                return jsonify({"error": "wallet not found"}), 404
+            if amount < 10:
+                return jsonify({"error": "minimum 10$"}), 400
+            if amount > uw["balance"]:
+                return jsonify({"error": "solde insuffisant"}), 400
+
+            asset_info = AI_TRADABLE.get(asset_key)
+            if not asset_info:
+                return jsonify({"error": "asset inconnu"}), 404
+            ticker, name = asset_info
+            price = get_asset_price(ticker)
+            if not price:
+                return jsonify({"error": "prix indisponible"}), 503
+
+            portfolio = uw.get("portfolio", {})
+            if asset_key in portfolio:
+                return jsonify({"error": "position déjà ouverte"}), 400
+
+            qty = amount / price
+            now_str = now_paris().strftime("%d/%m/%Y %H:%M")
+            portfolio[asset_key] = {"qty": qty, "buy_price": price, "name": name, "ticker": ticker, "type": "LONG", "date": now_str}
+            uw["portfolio"] = portfolio
+            uw["balance"] -= amount
+            uw["total_trades"] = uw.get("total_trades", 0) + 1
+            uw.setdefault("history", []).append({"date": now_str, "type": "BUY", "asset": name, "price": price, "qty": qty, "amount": amount, "pnl": 0, "pnl_pct": 0, "reason": "Achat manuel"})
+
+            wallets_data = load_user_wallets()
+            for sid, w in wallets_data.items():
+                if w.get("token","").upper() == token:
+                    wallets_data[sid] = uw
+                    break
+            save_user_wallets(wallets_data)
+            return jsonify({"ok": True, "price": price, "qty": qty})
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/trade/sell", methods=["POST"])
+    def api_trade_sell():
+        try:
+            data = request.get_json() or {}
+            token = data.get("token", "").upper().strip()
+            asset_key = data.get("asset_key", "").lower()
+
+            wallets = load_user_wallets()
+            uw_sid = next(((sid, w) for sid, w in wallets.items() if w.get("token","").upper() == token), None)
+            if not uw_sid:
+                return jsonify({"error": "wallet not found"}), 404
+            sid, uw = uw_sid
+
+            portfolio = uw.get("portfolio", {})
+            if asset_key not in portfolio:
+                return jsonify({"error": "position introuvable"}), 404
+
+            pos = portfolio.pop(asset_key)
+            price = get_asset_price(pos["ticker"]) or pos["buy_price"]
+            proceeds = pos["qty"] * price
+            pnl = proceeds - pos["buy_price"] * pos["qty"]
+            pnl_pct = pnl / (pos["buy_price"] * pos["qty"]) * 100
+
+            uw["portfolio"] = portfolio
+            uw["balance"] += proceeds
+            uw["total_trades"] = uw.get("total_trades", 0) + 1
+            uw["winning_trades"] = uw.get("winning_trades", 0) + int(pnl >= 0)
+            now_str = now_paris().strftime("%d/%m/%Y %H:%M")
+            uw.setdefault("history", []).append({"date": now_str, "type": "SELL", "asset": pos["name"], "price": price, "qty": pos["qty"], "amount": proceeds, "pnl": pnl, "pnl_pct": pnl_pct, "reason": "Vente manuelle"})
+
+            wallets[sid] = uw
+            save_user_wallets(wallets)
+            return jsonify({"ok": True, "price": price, "pnl": round(pnl, 2), "pnl_pct": round(pnl_pct, 2)})
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/copytrade/toggle", methods=["POST"])
+    def api_copytrade_toggle():
+        try:
+            data = request.get_json() or {}
+            token = data.get("token", "").upper().strip()
+            wallets = load_user_wallets()
+            for sid, w in wallets.items():
+                if w.get("token","").upper() == token:
+                    wallets[sid]["copy_trading"] = not w.get("copy_trading", False)
+                    save_user_wallets(wallets)
+                    return jsonify({"ok": True, "copy_trading": wallets[sid]["copy_trading"]})
+            return jsonify({"error": "wallet not found"}), 404
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
 
     @app.route("/health")
     def health(): return "ok"
@@ -3416,42 +3775,35 @@ def get_updates(offset=None):
 print("🤖 Bot démarré !")
 print("Fonctionnalités : Signaux(14) • RSI(9) • Paper Trading • Alertes • Score • Hebdo • Langues(FR/EN/ES)")
 
-# Préchauffage du cache au démarrage (en arrière-plan)
+# Préchauffage du cache + démarrage API web
+threading.Thread(target=_start_api_server, daemon=True).start()
+# Préchauffage du cache au démarrage (en arrière-plan — bot réactif immédiatement)
 print("Préchauffage cache news+marché en arrière-plan...")
 threading.Thread(target=_do_refresh_cache, daemon=True).start()
 
-# Boucle Telegram dans un thread dédié (Flask prend le thread principal)
-def _bot_loop():
-    offset = None
-    while True:
-        try:
-            updates = get_updates(offset)
-            for update in updates:
-                offset = update["update_id"] + 1
-                if "callback_query" in update:
-                    cq = update["callback_query"]
-                    answer_callback(cq["id"])
-                    cid = cq["message"]["chat"]["id"]
-                    uname = cq["message"]["chat"].get("first_name", "")
-                    print(f"Bouton: {cq['data'][:30]} | {cid}")
-                    handle_command(cid, cq["data"], uname)
-                elif "message" in update:
-                    msg = update["message"]
-                    txt = msg.get("text", "")
-                    cid = msg["chat"]["id"]
-                    uname = msg["chat"].get("first_name", "")
-                    if txt:
-                        print(f"Message: {txt[:30]} | {cid}")
-                        handle_command(cid, txt, uname)
-            check_auto_send()
-            time.sleep(1)
-        except Exception as e:
-            print(f"Erreur boucle: {e}")
-            time.sleep(5)
-
-# Le bot tourne en thread — Flask dans le thread principal (requis par Railway)
-threading.Thread(target=_bot_loop, daemon=True).start()
-print("Boucle Telegram demarree en thread")
-
-# Flask demarre dans le thread principal — Railway voit le port immediatement
-_start_api_server()
+offset = None
+while True:
+    try:
+        updates = get_updates(offset)
+        for update in updates:
+            offset = update["update_id"] + 1
+            if "callback_query" in update:
+                cq = update["callback_query"]
+                answer_callback(cq["id"])
+                cid = cq["message"]["chat"]["id"]
+                uname = cq["message"]["chat"].get("first_name", "")
+                print(f"Bouton: {cq['data'][:30]} | {cid}")
+                handle_command(cid, cq["data"], uname)
+            elif "message" in update:
+                msg = update["message"]
+                txt = msg.get("text", "")
+                cid = msg["chat"]["id"]
+                uname = msg["chat"].get("first_name", "")
+                if txt:
+                    print(f"Message: {txt[:30]} | {cid}")
+                    handle_command(cid, txt, uname)
+        check_auto_send()
+        time.sleep(1)
+    except Exception as e:
+        print(f"Erreur boucle: {e}")
+        time.sleep(5)
